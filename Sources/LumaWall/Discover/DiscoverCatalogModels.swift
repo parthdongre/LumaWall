@@ -53,3 +53,38 @@ enum DiscoverCatalogError: LocalizedError {
     }
   }
 }
+
+
+extension DiscoverWallpaperListing {
+  private enum CodingKeys: String, CodingKey {
+    case id
+    case name
+    case author
+    case description
+    case category
+    case tags
+    case type
+    case previewURL
+    case packageURL
+    case sha256
+    case featured
+    case version
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+
+    id = try container.decode(UUID.self, forKey: .id)
+    name = try container.decode(String.self, forKey: .name)
+    author = try container.decode(String.self, forKey: .author)
+    description = try container.decodeIfPresent(String.self, forKey: .description)
+    category = try container.decodeIfPresent(String.self, forKey: .category) ?? "Featured"
+    tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+    type = try container.decode(WallpaperType.self, forKey: .type)
+    previewURL = try container.decodeIfPresent(URL.self, forKey: .previewURL)
+    packageURL = try container.decode(URL.self, forKey: .packageURL)
+    sha256 = try container.decodeIfPresent(String.self, forKey: .sha256)
+    featured = try container.decodeIfPresent(Bool.self, forKey: .featured) ?? false
+    version = try container.decodeIfPresent(String.self, forKey: .version) ?? "1.0"
+  }
+}
