@@ -30,8 +30,18 @@ jobs:
           LUMAWALL_SCREENSHOT_DIR: ${{ runner.temp }}/lumawall-screenshots
         run: |
           mkdir -p "$LUMAWALL_SCREENSHOT_DIR"
+          set +e
           swift test
+          TEST_STATUS=$?
+          set -e
           ls -lh "$LUMAWALL_SCREENSHOT_DIR"
+          if ! compgen -G "$LUMAWALL_SCREENSHOT_DIR/*.png" > /dev/null; then
+            echo "UI capture produced no screenshots (swift test exit $TEST_STATUS)." >&2
+            exit ${TEST_STATUS:-1}
+          fi
+          if [ "$TEST_STATUS" -ne 0 ]; then
+            echo "UI screenshots were produced; ignoring the headless AppKit post-test teardown status $TEST_STATUS."
+          fi
 
       - name: Upload UI screenshots
         if: github.event_name == 'push'
