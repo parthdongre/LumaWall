@@ -137,9 +137,9 @@ ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
 echo "==> Creating styled DMG"
 DMG_ROOT="$(mktemp -d)"
-MOUNT_DIR="/Volumes/$VOLUME_NAME"
 RW_DMG="$DIST/LumaWall-$VERSION-rw.dmg"
 VOLUME_NAME="LumaWall $VERSION"
+MOUNT_DIR="/Volumes/$VOLUME_NAME"
 
 cleanup() {
   if mount | grep -Fq "$MOUNT_DIR"; then
