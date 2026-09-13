@@ -25,7 +25,13 @@ struct WallpaperDetailView: View {
               ForEach(model.displays) { d in Text(d.name).tag(Optional(d.id)) }
             }
             HStack {
-              Picker("FPS", selection: Binding(get: { model.targetFPS }, set: model.updateFPS)) {
+              Picker(
+                "FPS",
+                selection: Binding(
+                  get: { model.targetFPS },
+                  set: { fps in model.updateFPS(fps) }
+                )
+              ) {
                 Text("30").tag(30)
                 Text("60").tag(60)
                 Text("120").tag(120)
@@ -33,7 +39,10 @@ struct WallpaperDetailView: View {
               VStack(alignment: .leading) {
                 Text("Render scale \(Int(model.renderScale*100))%").font(.caption)
                 Slider(
-                  value: Binding(get: { model.renderScale }, set: model.updateRenderScale),
+                  value: Binding(
+                    get: { model.renderScale },
+                    set: { scale in model.updateRenderScale(scale) }
+                  ),
                   in: 0.25...1, step: 0.05)
               }
             }
