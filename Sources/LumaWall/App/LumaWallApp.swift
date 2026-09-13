@@ -55,6 +55,14 @@ struct LumaWallApp: App {
           model.importWallpaper()
         }
         .keyboardShortcut("o", modifiers: [.command, .shift])
+
+        Button("Import Wallpaper Engine Project…") {
+          model.chooseWallpaperEngineProject()
+        }
+
+        Button("Creator Studio") {
+          model.sidebarSelection = .creator
+        }
       }
     }
 
