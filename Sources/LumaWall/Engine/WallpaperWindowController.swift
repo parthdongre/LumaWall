@@ -1,14 +1,19 @@
 import AppKit
 import CoreGraphics
 
+private final class WallpaperPanel: NSPanel {
+  override var canBecomeKey: Bool { false }
+  override var canBecomeMain: Bool { false }
+}
+
 @MainActor
 final class WallpaperWindowController {
-  let display: DisplayDescriptor
+  private(set) var display: DisplayDescriptor
   let renderer: WallpaperRenderer
   let wallpaperID: UUID
   let grantedPermissions: Set<WallpaperPermission>
 
-  private let window: NSPanel
+  private let window: WallpaperPanel
   private var isClosed = false
 
   init(
@@ -22,24 +27,31 @@ final class WallpaperWindowController {
     self.grantedPermissions = grantedPermissions
     self.renderer = renderer
 
-    let desktopIconLevel = Int(CGWindowLevelForKey(.desktopIconWindow))
-    let window = NSPanel(
+    let desktopLevel = Int(CGWindowLevelForKey(.desktopWindow))
+    let iconLevel = Int(CGWindowLevelForKey(.desktopIconWindow))
+    let wallpaperLevel = min(desktopLevel + 1, iconLevel - 1)
+
+    let window = WallpaperPanel(
       contentRect: display.screen.frame,
       styleMask: [.borderless, .nonactivatingPanel],
       backing: .buffered,
       defer: false,
       screen: display.screen
     )
-    window.level = NSWindow.Level(rawValue: desktopIconLevel - 1)
+
+    window.level = NSWindow.Level(rawValue: wallpaperLevel)
     window.collectionBehavior = [
-      .canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary,
+      .canJoinAllSpaces,
+      .stationary,
+      .ignoresCycle,
+      .fullScreenAuxiliary,
     ]
     window.ignoresMouseEvents = true
     window.isOpaque = true
     window.hasShadow = false
     window.backgroundColor = .black
     window.hidesOnDeactivate = false
-    window.becomesKeyOnlyIfNeeded = true
+    window.becomesKeyOnlyIfNeeded = false
     window.isFloatingPanel = false
     window.isExcludedFromWindowsMenu = true
     window.contentView = renderer.view
@@ -49,12 +61,25 @@ final class WallpaperWindowController {
 
   func show() {
     guard !isClosed else { return }
-    window.orderFrontRegardless()
+
+    // A wallpaper belongs above macOS's static desktop picture but below Finder
+    // icons and every normal application window. Never force it to the front.
+    window.orderBack(nil)
+  }
+
+  func updateDisplay(_ updatedDisplay: DisplayDescriptor) {
+    guard !isClosed else { return }
+    display = updatedDisplay
+    renderer.configure(for: updatedDisplay)
+    window.setFrame(updatedDisplay.screen.frame, display: true)
+    window.orderBack(nil)
   }
 
   func updateFrame() {
     guard !isClosed else { return }
+    renderer.configure(for: display)
     window.setFrame(display.screen.frame, display: true)
+    window.orderBack(nil)
   }
 
   func close() {
