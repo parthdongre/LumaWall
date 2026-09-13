@@ -15,6 +15,9 @@ final class WallpaperWindowController {
   let grantedPermissions: Set<WallpaperPermission>
 
   private let window: WallpaperPanel
+  private let rootView = NSView()
+  private let timeDateOverlay = TimeDateOverlayView()
+
   private var isClosed = false
   private var fullscreenSuppressed = false
 
@@ -29,48 +32,24 @@ final class WallpaperWindowController {
     self.grantedPermissions = grantedPermissions
     self.renderer = renderer
 
-    let desktopLevel =
-      Int(
-        CGWindowLevelForKey(
-          .desktopWindow
-        )
-      )
-
-    let iconLevel =
-      Int(
-        CGWindowLevelForKey(
-          .desktopIconWindow
-        )
-      )
-
-    let wallpaperLevel =
-      min(
-        desktopLevel + 1,
-        iconLevel - 1
-      )
+    let desktopLevel = Int(CGWindowLevelForKey(.desktopWindow))
+    let iconLevel = Int(CGWindowLevelForKey(.desktopIconWindow))
+    let wallpaperLevel = min(desktopLevel + 1, iconLevel - 1)
 
     let window = WallpaperPanel(
       contentRect: display.screen.frame,
-      styleMask: [
-        .borderless,
-        .nonactivatingPanel,
-      ],
+      styleMask: [.borderless, .nonactivatingPanel],
       backing: .buffered,
       defer: false,
       screen: display.screen
     )
 
-    window.level =
-      NSWindow.Level(
-        rawValue: wallpaperLevel
-      )
-
+    window.level = NSWindow.Level(rawValue: wallpaperLevel)
     window.collectionBehavior = [
       .canJoinAllSpaces,
       .stationary,
       .ignoresCycle,
     ]
-
     window.ignoresMouseEvents = true
     window.isOpaque = true
     window.hasShadow = false
@@ -79,56 +58,54 @@ final class WallpaperWindowController {
     window.becomesKeyOnlyIfNeeded = false
     window.isFloatingPanel = false
     window.isExcludedFromWindowsMenu = true
-    window.contentView = renderer.view
-    window.setFrame(
-      display.screen.frame,
-      display: true
-    )
-    window.contentView?.wantsLayer = true
+
+    rootView.wantsLayer = true
+    rootView.layer?.backgroundColor = NSColor.black.cgColor
+
+    renderer.view.translatesAutoresizingMaskIntoConstraints = false
+    timeDateOverlay.translatesAutoresizingMaskIntoConstraints = false
+
+    rootView.addSubview(renderer.view)
+    rootView.addSubview(timeDateOverlay)
+
+    NSLayoutConstraint.activate([
+      renderer.view.leadingAnchor.constraint(equalTo: rootView.leadingAnchor),
+      renderer.view.trailingAnchor.constraint(equalTo: rootView.trailingAnchor),
+      renderer.view.topAnchor.constraint(equalTo: rootView.topAnchor),
+      renderer.view.bottomAnchor.constraint(equalTo: rootView.bottomAnchor),
+
+      timeDateOverlay.leadingAnchor.constraint(equalTo: rootView.leadingAnchor),
+      timeDateOverlay.trailingAnchor.constraint(equalTo: rootView.trailingAnchor),
+      timeDateOverlay.topAnchor.constraint(equalTo: rootView.topAnchor),
+      timeDateOverlay.bottomAnchor.constraint(equalTo: rootView.bottomAnchor),
+    ])
+
+    window.contentView = rootView
+    window.setFrame(display.screen.frame, display: true)
 
     self.window = window
   }
 
-  var windowNumber: Int {
-    window.windowNumber
+  var windowNumber: Int { window.windowNumber }
+
+  func setTimeDateOverlay(_ settings: TimeDateOverlaySettings) {
+    timeDateOverlay.apply(settings)
   }
 
-  func show(
-    alpha: CGFloat = 1
-  ) {
-    guard
-      !isClosed,
-      !fullscreenSuppressed
-    else {
-      return
-    }
-
+  func show(alpha: CGFloat = 1) {
+    guard !isClosed, !fullscreenSuppressed else { return }
     window.alphaValue = alpha
     window.orderBack(nil)
   }
 
-  func orderAbove(
-    _ other:
-      WallpaperWindowController
-  ) {
-    guard
-      !isClosed,
-      !fullscreenSuppressed
-    else {
-      return
-    }
-
-    window.order(
-      .above,
-      relativeTo: other.windowNumber
-    )
+  func orderAbove(_ other: WallpaperWindowController) {
+    guard !isClosed, !fullscreenSuppressed else { return }
+    window.order(.above, relativeTo: other.windowNumber)
   }
 
   func transitionIn(
-    settings:
-      WallpaperTransitionSettings,
-    completion:
-      @escaping @MainActor () -> Void
+    settings: WallpaperTransitionSettings,
+    completion: @escaping @MainActor () -> Void
   ) {
     guard !isClosed else {
       completion()
@@ -146,134 +123,76 @@ final class WallpaperWindowController {
     }
 
     if settings.style == .zoom {
-      window.contentView?
-        .layer?
-        .transform =
-        CATransform3DMakeScale(
-          1.035,
-          1.035,
-          1
-        )
+      rootView.layer?.transform = CATransform3DMakeScale(1.035, 1.035, 1)
     }
 
-    NSAnimationContext
-      .runAnimationGroup {
-        context in
-        context.duration =
-          settings.duration
-        context.timingFunction =
-          CAMediaTimingFunction(
-            name:
-              .easeInEaseOut
-          )
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = settings.duration
+      context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
 
-        window.animator()
-          .alphaValue = 1
+      window.animator().alphaValue = 1
 
-        if settings.style
-          == .zoom
-        {
-          window.contentView?
-            .layer?
-            .transform =
-            CATransform3DIdentity
-        }
-      } completionHandler: {
-        Task {
-          @MainActor in
-          completion()
-        }
+      if settings.style == .zoom {
+        rootView.layer?.transform = CATransform3DIdentity
       }
+    } completionHandler: {
+      Task { @MainActor in
+        completion()
+      }
+    }
   }
 
   func transitionOut(
-    settings:
-      WallpaperTransitionSettings,
-    completion:
-      @escaping @MainActor () -> Void
+    settings: WallpaperTransitionSettings,
+    completion: @escaping @MainActor () -> Void
   ) {
     guard !isClosed else {
       completion()
       return
     }
 
-    guard
-      settings.style != .instant,
-      settings.duration > 0
-    else {
+    guard settings.style != .instant, settings.duration > 0 else {
       window.alphaValue = 0
       completion()
       return
     }
 
     let duration =
-      settings.style
-        == .fadeThroughBlack
+      settings.style == .fadeThroughBlack
       ? settings.duration * 0.55
       : settings.duration
 
-    NSAnimationContext
-      .runAnimationGroup {
-        context in
-        context.duration = duration
-        context.timingFunction =
-          CAMediaTimingFunction(
-            name:
-              .easeInEaseOut
-          )
-        window.animator()
-          .alphaValue = 0
-      } completionHandler: {
-        Task {
-          @MainActor in
-          completion()
-        }
+    NSAnimationContext.runAnimationGroup { context in
+      context.duration = duration
+      context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+      window.animator().alphaValue = 0
+    } completionHandler: {
+      Task { @MainActor in
+        completion()
       }
+    }
   }
 
-  func setFullscreenSuppressed(
-    _ suppressed: Bool
-  ) {
-    guard
-      !isClosed,
-      fullscreenSuppressed
-        != suppressed
-    else {
-      return
-    }
+  func setFullscreenSuppressed(_ suppressed: Bool) {
+    guard !isClosed, fullscreenSuppressed != suppressed else { return }
 
-    fullscreenSuppressed =
-      suppressed
+    fullscreenSuppressed = suppressed
 
     if suppressed {
       window.orderOut(nil)
     } else {
-      window.setFrame(
-        display.screen.frame,
-        display: true
-      )
+      window.setFrame(display.screen.frame, display: true)
       window.alphaValue = 1
       window.orderBack(nil)
     }
   }
 
-  func updateDisplay(
-    _ updatedDisplay:
-      DisplayDescriptor
-  ) {
-    guard !isClosed else {
-      return
-    }
+  func updateDisplay(_ updatedDisplay: DisplayDescriptor) {
+    guard !isClosed else { return }
 
     display = updatedDisplay
-    renderer.configure(
-      for: updatedDisplay
-    )
-
-    window.setFrame(
-      updatedDisplay.screen.frame,
-      display: true
-    )
+    renderer.configure(for: updatedDisplay)
+    window.setFrame(updatedDisplay.screen.frame, display: true)
 
     if !fullscreenSuppressed {
       window.orderBack(nil)
@@ -281,18 +200,10 @@ final class WallpaperWindowController {
   }
 
   func updateFrame() {
-    guard !isClosed else {
-      return
-    }
+    guard !isClosed else { return }
 
-    renderer.configure(
-      for: display
-    )
-
-    window.setFrame(
-      display.screen.frame,
-      display: true
-    )
+    renderer.configure(for: display)
+    window.setFrame(display.screen.frame, display: true)
 
     if !fullscreenSuppressed {
       window.orderBack(nil)
@@ -300,20 +211,17 @@ final class WallpaperWindowController {
   }
 
   func close() {
-    guard !isClosed else {
-      return
-    }
-
+    guard !isClosed else { return }
     isClosed = true
+
+    timeDateOverlay.stop()
     renderer.pause()
     renderer.stop()
 
     window.orderOut(nil)
     window.contentView = nil
 
-    let retiredWindow =
-      window
-
+    let retiredWindow = window
     DispatchQueue.main.async {
       retiredWindow.close()
     }

@@ -33,6 +33,7 @@ final class AppModel: ObservableObject {
   @Published var displayProfiles: [CGDirectDisplayID: DisplayPerformanceProfile] = [:]
   @Published var fitModes: [UUID: WallpaperFitMode] = [:]
   @Published var videoPlaybackSettings: [UUID: VideoPlaybackSettings] = [:]
+  @Published var timeDateOverlaySettings: [UUID: TimeDateOverlaySettings] = [:]
   @Published var usePowerProfiles = true
   @Published var pluggedInProfile = PowerPerformanceProfile.pluggedIn
   @Published var batteryProfile = PowerPerformanceProfile.battery
@@ -73,6 +74,7 @@ final class AppModel: ObservableObject {
     static let displayProfiles = "rendering.displayProfiles"
     static let fitModes = "rendering.fitModes"
     static let videoSettings = "rendering.videoSettings"
+    static let timeDateSettings = "overlay.timeDateSettings"
     static let usePowerProfiles = "performance.usePowerProfiles"
     static let pluggedInProfile = "performance.pluggedInProfile"
     static let batteryProfile = "performance.batteryProfile"
@@ -140,6 +142,7 @@ final class AppModel: ObservableObject {
 
     fitModes = Self.loadFitModes(from: defaults)
     videoPlaybackSettings = Self.loadVideoSettings(from: defaults)
+    timeDateOverlaySettings = Self.loadTimeDateSettings(from: defaults)
     displayProfiles = Self.loadDisplayProfiles(
       from: defaults,
       displays: detectedDisplays,
@@ -179,6 +182,9 @@ final class AppModel: ObservableObject {
     }
     for (id, settings) in videoPlaybackSettings {
       engine.setVideoPlaybackSettings(settings, for: id)
+    }
+    for (id, settings) in timeDateOverlaySettings {
+      engine.setTimeDateOverlay(settings, for: id)
     }
 
     let savedProperties = Self.loadSavedProperties(from: defaults)
@@ -761,6 +767,28 @@ final class AppModel: ObservableObject {
     engine.setFitMode(mode, for: wallpaperID)
   }
 
+  func timeDateSettings(for wallpaperID: UUID) -> TimeDateOverlaySettings {
+    timeDateOverlaySettings[wallpaperID] ?? .init()
+  }
+
+  func updateTimeDateSettings(
+    _ settings: TimeDateOverlaySettings,
+    for wallpaperID: UUID
+  ) {
+    timeDateOverlaySettings[wallpaperID] = settings
+    saveTimeDateSettings()
+    engine.setTimeDateOverlay(settings, for: wallpaperID)
+  }
+
+  func applyTimeDatePreset(
+    _ preset: TimeDateOverlaySettings,
+    to wallpaperID: UUID
+  ) {
+    var value = preset
+    value.enabled = true
+    updateTimeDateSettings(value, for: wallpaperID)
+  }
+
   func videoSettings(for wallpaperID: UUID) -> VideoPlaybackSettings {
     videoPlaybackSettings[wallpaperID] ?? .init()
   }
@@ -1074,6 +1102,17 @@ final class AppModel: ObservableObject {
     }
   }
 
+  private func saveTimeDateSettings() {
+    let dictionary = Dictionary(
+      uniqueKeysWithValues: timeDateOverlaySettings.map {
+        ($0.key.uuidString, $0.value)
+      }
+    )
+    if let data = try? JSONEncoder().encode(dictionary) {
+      defaults.set(data, forKey: Keys.timeDateSettings)
+    }
+  }
+
   private func savePowerProfile(
     _ profile: PowerPerformanceProfile,
     key: String
@@ -1146,6 +1185,26 @@ final class AppModel: ObservableObject {
       let data = defaults.data(forKey: Keys.videoSettings),
       let dictionary = try? JSONDecoder().decode(
         [String: VideoPlaybackSettings].self,
+        from: data
+      )
+    else {
+      return [:]
+    }
+
+    return dictionary.reduce(into: [:]) { result, element in
+      if let id = UUID(uuidString: element.key) {
+        result[id] = element.value
+      }
+    }
+  }
+
+  private static func loadTimeDateSettings(
+    from defaults: UserDefaults
+  ) -> [UUID: TimeDateOverlaySettings] {
+    guard
+      let data = defaults.data(forKey: Keys.timeDateSettings),
+      let dictionary = try? JSONDecoder().decode(
+        [String: TimeDateOverlaySettings].self,
         from: data
       )
     else {

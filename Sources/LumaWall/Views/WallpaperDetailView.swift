@@ -235,6 +235,251 @@ struct WallpaperDetailView: View {
           }
         }
 
+        GroupBox("Time & Date Overlay") {
+          let clock = model.timeDateSettings(for: wallpaper.id)
+
+          VStack(alignment: .leading, spacing: 14) {
+            HStack {
+              Toggle(
+                "Show Time & Date",
+                isOn: Binding(
+                  get: { clock.enabled },
+                  set: { enabled in
+                    var updated = model.timeDateSettings(for: wallpaper.id)
+                    updated.enabled = enabled
+                    model.updateTimeDateSettings(updated, for: wallpaper.id)
+                  }
+                )
+              )
+
+              Spacer()
+
+              Menu("Presets") {
+                Button("Glass") {
+                  model.applyTimeDatePreset(.glass, to: wallpaper.id)
+                }
+                Button("Minimal") {
+                  model.applyTimeDatePreset(.minimal, to: wallpaper.id)
+                }
+                Button("Bold Center") {
+                  model.applyTimeDatePreset(.bold, to: wallpaper.id)
+                }
+              }
+            }
+
+            if clock.enabled {
+              Grid(
+                alignment: .leading,
+                horizontalSpacing: 18,
+                verticalSpacing: 10
+              ) {
+                GridRow {
+                  Text("Position")
+                  Picker(
+                    "",
+                    selection: Binding(
+                      get: { clock.position },
+                      set: { position in
+                        var updated = model.timeDateSettings(for: wallpaper.id)
+                        updated.position = position
+                        model.updateTimeDateSettings(updated, for: wallpaper.id)
+                      }
+                    )
+                  ) {
+                    ForEach(ClockOverlayPosition.allCases) { position in
+                      Text(position.displayName)
+                        .tag(position)
+                    }
+                  }
+                }
+
+                GridRow {
+                  Text("Hour format")
+                  Picker(
+                    "",
+                    selection: Binding(
+                      get: { clock.hourFormat },
+                      set: { format in
+                        var updated = model.timeDateSettings(for: wallpaper.id)
+                        updated.hourFormat = format
+                        model.updateTimeDateSettings(updated, for: wallpaper.id)
+                      }
+                    )
+                  ) {
+                    ForEach(ClockHourFormat.allCases) { format in
+                      Text(format.displayName)
+                        .tag(format)
+                    }
+                  }
+                }
+
+                GridRow {
+                  Text("Date")
+                  Picker(
+                    "",
+                    selection: Binding(
+                      get: { clock.dateStyle },
+                      set: { style in
+                        var updated = model.timeDateSettings(for: wallpaper.id)
+                        updated.dateStyle = style
+                        model.updateTimeDateSettings(updated, for: wallpaper.id)
+                      }
+                    )
+                  ) {
+                    ForEach(ClockDateStyle.allCases) { style in
+                      Text(style.displayName)
+                        .tag(style)
+                    }
+                  }
+                }
+
+                GridRow {
+                  Text("Weight")
+                  Picker(
+                    "",
+                    selection: Binding(
+                      get: { clock.fontWeight },
+                      set: { weight in
+                        var updated = model.timeDateSettings(for: wallpaper.id)
+                        updated.fontWeight = weight
+                        model.updateTimeDateSettings(updated, for: wallpaper.id)
+                      }
+                    )
+                  ) {
+                    ForEach(ClockFontWeight.allCases) { weight in
+                      Text(weight.displayName)
+                        .tag(weight)
+                    }
+                  }
+                }
+              }
+
+              HStack {
+                Toggle(
+                  "Seconds",
+                  isOn: Binding(
+                    get: { clock.showSeconds },
+                    set: { enabled in
+                      var updated = model.timeDateSettings(for: wallpaper.id)
+                      updated.showSeconds = enabled
+                      model.updateTimeDateSettings(updated, for: wallpaper.id)
+                    }
+                  )
+                )
+
+                Toggle(
+                  "Weekday",
+                  isOn: Binding(
+                    get: { clock.showWeekday },
+                    set: { enabled in
+                      var updated = model.timeDateSettings(for: wallpaper.id)
+                      updated.showWeekday = enabled
+                      model.updateTimeDateSettings(updated, for: wallpaper.id)
+                    }
+                  )
+                )
+
+                Toggle(
+                  "Glass",
+                  isOn: Binding(
+                    get: { clock.glassEnabled },
+                    set: { enabled in
+                      var updated = model.timeDateSettings(for: wallpaper.id)
+                      updated.glassEnabled = enabled
+                      model.updateTimeDateSettings(updated, for: wallpaper.id)
+                    }
+                  )
+                )
+
+                Toggle(
+                  "Shadow",
+                  isOn: Binding(
+                    get: { clock.shadow },
+                    set: { enabled in
+                      var updated = model.timeDateSettings(for: wallpaper.id)
+                      updated.shadow = enabled
+                      model.updateTimeDateSettings(updated, for: wallpaper.id)
+                    }
+                  )
+                )
+              }
+
+              HStack {
+                Text("Clock size")
+                Slider(
+                  value: Binding(
+                    get: { clock.timeFontSize },
+                    set: { value in
+                      var updated = model.timeDateSettings(for: wallpaper.id)
+                      updated.timeFontSize = value
+                      model.updateTimeDateSettings(updated, for: wallpaper.id)
+                    }
+                  ),
+                  in: 28...160,
+                  step: 2
+                )
+                Text("\(Int(clock.timeFontSize)) pt")
+                  .monospacedDigit()
+                  .foregroundStyle(.secondary)
+                  .frame(width: 52)
+              }
+
+              HStack {
+                Text("Opacity")
+                Slider(
+                  value: Binding(
+                    get: { clock.opacity },
+                    set: { value in
+                      var updated = model.timeDateSettings(for: wallpaper.id)
+                      updated.opacity = value
+                      model.updateTimeDateSettings(updated, for: wallpaper.id)
+                    }
+                  ),
+                  in: 0.2...1,
+                  step: 0.05
+                )
+                Text("\(Int(clock.opacity * 100))%")
+                  .monospacedDigit()
+                  .foregroundStyle(.secondary)
+                  .frame(width: 44)
+              }
+
+              ColorPicker(
+                "Text color",
+                selection: Binding(
+                  get: { Color(hex: clock.colorHex) },
+                  set: { color in
+                    var updated = model.timeDateSettings(for: wallpaper.id)
+                    updated.colorHex = color.hexString
+                    model.updateTimeDateSettings(updated, for: wallpaper.id)
+                  }
+                )
+              )
+
+              TextField(
+                "Timezone identifier — blank uses macOS timezone",
+                text: Binding(
+                  get: { clock.timezoneIdentifier ?? "" },
+                  set: { text in
+                    var updated = model.timeDateSettings(for: wallpaper.id)
+                    updated.timezoneIdentifier =
+                      text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                      ? nil
+                      : text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    model.updateTimeDateSettings(updated, for: wallpaper.id)
+                  }
+                )
+              )
+
+              Text(
+                "Examples: Asia/Kolkata, Europe/London, America/New_York. The overlay is rendered natively above any image, video, WebGL or Metal wallpaper."
+              )
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            }
+          }
+        }
+
         if !currentWallpaper.properties.isEmpty {
           GroupBox("Creator controls") {
             VStack(alignment: .leading, spacing: 14) {

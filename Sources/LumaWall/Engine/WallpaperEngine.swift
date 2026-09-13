@@ -70,6 +70,10 @@ final class WallpaperEngine {
     [UUID:
       VideoPlaybackSettings] = [:]
 
+  private var timeDateSettings:
+    [UUID:
+      TimeDateOverlaySettings] = [:]
+
   private var previousInteraction:
     [CGDirectDisplayID:
       InteractionState] = [:]
@@ -171,6 +175,29 @@ final class WallpaperEngine {
           .setFitMode(
             mode
           )
+      }
+  }
+
+  func setTimeDateOverlay(
+    _ settings:
+      TimeDateOverlaySettings,
+    for wallpaperID:
+      UUID
+  ) {
+    timeDateSettings[
+      wallpaperID
+    ] = settings
+
+    controllers
+      .values
+      .filter {
+        $0.wallpaperID
+          == wallpaperID
+      }
+      .forEach {
+        $0.setTimeDateOverlay(
+          settings
+        )
       }
   }
 
@@ -278,6 +305,13 @@ final class WallpaperEngine {
       controllers[
         display.id
       ] = incoming
+
+      incoming.setTimeDateOverlay(
+        timeDateSettings[
+          wallpaper.id
+        ]
+        ?? .init()
+      )
 
       configurePerformance(
         for: incoming
