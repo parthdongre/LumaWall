@@ -55,7 +55,7 @@ jobs:
       - name: Package installable macOS artifacts
         if: github.event_name == 'push'
         env:
-          VERSION: 0.3.5
+          VERSION: 0.4.0
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           chmod +x scripts/package-macos.sh
@@ -66,7 +66,7 @@ jobs:
         run: |
           VERIFY_MOUNT="$RUNNER_TEMP/lumawall-dmg-verify"
           mkdir -p "$VERIFY_MOUNT"
-          hdiutil attach "$PWD/dist/LumaWall-0.3.5.dmg" -readonly -noverify -noautoopen -mountpoint "$VERIFY_MOUNT" >/dev/null
+          hdiutil attach "$PWD/dist/LumaWall-0.4.0.dmg" -readonly -noverify -noautoopen -mountpoint "$VERIFY_MOUNT" >/dev/null
 
           test -d "$VERIFY_MOUNT/LumaWall.app"
           test -L "$VERIFY_MOUNT/Applications"
@@ -96,9 +96,9 @@ jobs:
           name: LumaWall-macOS-${{ github.sha }}
           path: |
             dist/LumaWall.app
-            dist/LumaWall-0.3.5-macOS.zip
-            dist/LumaWall-0.3.5.dmg
-            dist/LumaWall-0.3.5.pkg
+            dist/LumaWall-0.4.0-macOS.zip
+            dist/LumaWall-0.4.0.dmg
+            dist/LumaWall-0.4.0.pkg
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14

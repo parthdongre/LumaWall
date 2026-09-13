@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 - Creator Studio
+
+- Added an in-app Creator Studio for turning Canva image/video exports into LumaWall wallpapers without JSON editing or Terminal.
+- Supports PNG, JPEG, HEIC, TIFF, WebP, MP4, MOV and M4V source artwork.
+- Creator metadata includes title, author/studio, description, category and tags.
+- Optional custom thumbnail support; image wallpapers reuse the source artwork without duplicating it.
+- Creator output can be added directly to the local Library or exported as a portable .wall package.
+- Per-wallpaper presentation choices include fit mode, video loop/mute/playback speed and optional Time & Date presets.
+- Large Creator asset copies run away from the main actor to keep the control UI responsive.
+- Added Creator package regression tests for metadata, image/video packaging, thumbnails, unsupported formats and Time/Date presets.
+
 ## 0.3.5 - Fullscreen stability regression fix
 
 - Fixed normal maximized browser/app windows being misclassified as fullscreen.

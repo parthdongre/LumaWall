@@ -12,6 +12,11 @@ struct WallpaperManifest: Codable, Sendable {
   var renderer: RendererSettings?
   var properties: [WallpaperProperty]?
   var permissions: Set<WallpaperPermission>?
+  var description: String? = nil
+  var tags: [String]? = nil
+  var category: String? = nil
+  var version: String? = nil
+  var source: String? = nil
 
   struct RendererSettings: Codable, Sendable {
     var fps: Int?

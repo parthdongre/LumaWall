@@ -6,6 +6,7 @@ final class WallpaperLibrary {
   private let fileManager = FileManager.default
   private let packageService = WallpaperPackageService()
   private let previewGenerator = PreviewGenerator()
+  private let creatorBuilder = CreatorPackageBuilder()
 
   var libraryRoot: URL {
     let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -30,6 +31,35 @@ final class WallpaperLibrary {
     let existingIDs = Set(result.map(\.id))
     result.insert(contentsOf: bundled.filter { !existingIDs.contains($0.id) }, at: 0)
     return result
+  }
+
+  func inspectCreatorAsset(_ source: URL) throws -> CreatorAssetSummary {
+    try creatorBuilder.summary(for: source)
+  }
+
+  func createWallpaper(from draft: CreatorWallpaperDraft) async throws -> Wallpaper {
+    let id = UUID()
+    let root = libraryRoot
+
+    let packageRoot = try await Task.detached(priority: .userInitiated) {
+      let builder = CreatorPackageBuilder()
+
+      do {
+        return try builder.build(
+          draft: draft,
+          id: id,
+          at: root
+        )
+      } catch {
+        let partial = root.appendingPathComponent(id.uuidString, isDirectory: true)
+        try? FileManager.default.removeItem(at: partial)
+        throw error
+      }
+    }.value
+
+    let wallpaper = try packageService.loadPackage(at: packageRoot, id: id)
+    try persist(wallpaper)
+    return wallpaper
   }
 
   func importWallpaper(from source: URL) throws -> Wallpaper {

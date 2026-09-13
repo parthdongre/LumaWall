@@ -4,6 +4,7 @@ enum SidebarDestination: Hashable {
   case library(LibraryScope)
   case displays
   case automations
+  case creator
   case diagnostics
   case wallpaper(UUID)
 }
@@ -21,6 +22,11 @@ struct ContentView: View {
             .tag(SidebarDestination.library(.favorites))
           Label("Recent", systemImage: "clock")
             .tag(SidebarDestination.library(.recent))
+        }
+
+        Section("Create") {
+          Label("Creator Studio", systemImage: "wand.and.stars")
+            .tag(SidebarDestination.creator)
         }
 
         Section("System") {
@@ -46,6 +52,8 @@ struct ContentView: View {
         DisplaysView()
       case .automations:
         AutomationView()
+      case .creator:
+        CreatorStudioView()
       case .diagnostics:
         DiagnosticsView()
       case .wallpaper(let id):

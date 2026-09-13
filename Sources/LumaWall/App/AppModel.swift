@@ -38,6 +38,9 @@ final class AppModel: ObservableObject {
   @Published var pluggedInProfile = PowerPerformanceProfile.pluggedIn
   @Published var batteryProfile = PowerPerformanceProfile.battery
   @Published var lowPowerProfile = PowerPerformanceProfile.lowPower
+  @Published var creatorDraft = CreatorWallpaperDraft()
+  @Published var creatorAssetSummary: CreatorAssetSummary?
+  @Published var creatorIsCreating = false
 
   let engine = WallpaperEngine()
   let governor = PerformanceGovernor()
@@ -79,6 +82,7 @@ final class AppModel: ObservableObject {
     static let pluggedInProfile = "performance.pluggedInProfile"
     static let batteryProfile = "performance.batteryProfile"
     static let lowPowerProfile = "performance.lowPowerProfile"
+    static let creatorAuthor = "creator.defaultAuthor"
   }
 
   init() {
@@ -88,6 +92,7 @@ final class AppModel: ObservableObject {
     displays = detectedDisplays
     wallpapers = library.loadAll()
     selectedWallpaperID = wallpapers.first?.id
+    creatorDraft.author = defaults.string(forKey: Keys.creatorAuthor) ?? ""
     showOnboarding = !defaults.bool(forKey: Keys.onboardingCompleted)
 
     favoriteWallpaperIDs = Set(
@@ -558,6 +563,124 @@ final class AppModel: ObservableObject {
     updater.checkForUpdates(currentVersion: AppVersion.version)
   }
 
+  func chooseCreatorAsset() {
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    panel.allowsMultipleSelection = false
+    panel.prompt = "Choose Artwork"
+    panel.message = "Choose a Canva image or video export."
+
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    setCreatorSource(url)
+  }
+
+  func setCreatorSource(_ url: URL) {
+    do {
+      let summary = try library.inspectCreatorAsset(url)
+      creatorAssetSummary = summary
+      creatorDraft.sourceURL = url
+
+      if creatorDraft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        creatorDraft.name = url.deletingPathExtension().lastPathComponent
+      }
+
+      statusMessage = "Selected \(summary.filename)"
+    } catch {
+      show(error)
+    }
+  }
+
+  func chooseCreatorThumbnail() {
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    panel.allowsMultipleSelection = false
+    panel.prompt = "Choose Thumbnail"
+    panel.message = "Choose a PNG, JPEG, HEIC, TIFF or WebP thumbnail."
+
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+
+    let ext = url.pathExtension.lowercased()
+    guard ["png", "jpg", "jpeg", "heic", "tiff", "webp"].contains(ext) else {
+      show(CreatorPackageError.unsupportedSource(ext))
+      return
+    }
+
+    creatorDraft.thumbnailURL = url
+  }
+
+  func clearCreatorThumbnail() {
+    creatorDraft.thumbnailURL = nil
+  }
+
+  func resetCreatorStudio() {
+    creatorDraft.reset(keepingAuthor: true)
+    creatorAssetSummary = nil
+  }
+
+  func createCreatorWallpaper(exportAfterCreation: Bool = false) {
+    guard creatorDraft.isReadyToCreate, !creatorIsCreating else { return }
+
+    creatorIsCreating = true
+    let draft = creatorDraft
+    defaults.set(draft.author, forKey: Keys.creatorAuthor)
+
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+
+      defer {
+        self.creatorIsCreating = false
+      }
+
+      do {
+        var wallpaper = try await self.library.createWallpaper(from: draft)
+
+        if wallpaper.thumbnailURL == nil {
+          wallpaper = await self.library.generatePreviewIfNeeded(for: wallpaper)
+        }
+
+        self.wallpapers.removeAll(where: { $0.id == wallpaper.id })
+        self.wallpapers.append(wallpaper)
+        self.propertyValues[wallpaper.id] = [:]
+
+        self.fitModes[wallpaper.id] = draft.fitMode
+        self.saveFitModes()
+        self.engine.setFitMode(draft.fitMode, for: wallpaper.id)
+
+        if wallpaper.type == .video {
+          let settings = VideoPlaybackSettings(
+            playbackRate: draft.videoPlaybackRate,
+            muted: draft.videoMuted,
+            loop: draft.videoLoop
+          )
+          self.videoPlaybackSettings[wallpaper.id] = settings
+          self.saveVideoSettings()
+          self.engine.setVideoPlaybackSettings(settings, for: wallpaper.id)
+        }
+
+        if let overlay = draft.clockPreset.overlaySettings {
+          self.timeDateOverlaySettings[wallpaper.id] = overlay
+          self.saveTimeDateSettings()
+          self.engine.setTimeDateOverlay(overlay, for: wallpaper.id)
+        }
+
+        self.selectedWallpaperID = wallpaper.id
+        self.sidebarSelection = .wallpaper(wallpaper.id)
+        self.statusMessage = "Created \(wallpaper.name)"
+
+        if exportAfterCreation {
+          self.exportWallpaper(wallpaper)
+        }
+
+        self.creatorDraft.reset(keepingAuthor: true)
+        self.creatorAssetSummary = nil
+      } catch {
+        self.show(error)
+      }
+    }
+  }
+
   func importWallpaper() {
     let panel = NSOpenPanel()
     panel.canChooseDirectories = true
@@ -588,12 +711,19 @@ final class AppModel: ObservableObject {
 
   func exportSelectedWallpaper() {
     guard let wallpaper = selectedWallpaper else { return }
+    exportWallpaper(wallpaper)
+  }
+
+  private func exportWallpaper(_ wallpaper: Wallpaper) {
     let panel = NSSavePanel()
     panel.nameFieldStringValue = "\(wallpaper.name).wall"
+
     guard panel.runModal() == .OK, var url = panel.url else { return }
+
     if url.pathExtension.lowercased() != "wall" {
       url.appendPathExtension("wall")
     }
+
     do {
       try library.exportWallpaper(wallpaper, to: url)
       statusMessage = "Exported \(wallpaper.name)"

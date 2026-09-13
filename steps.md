@@ -199,3 +199,14 @@ Entering fullscreen requires two consistent samples, while leaving fullscreen re
 Fullscreen pause is now renderer-only. LumaWall keeps the desktop panel resident below Finder's icon level and never uses fullScreenAuxiliary. The renderer stops producing frames, audio-reactive updates and mouse interaction for that display, but the panel is not removed and reinserted, avoiding desktop flicker and ordering races.
 
 The regression suite includes the exact high-coverage maximized-window case from the recording plus multi-display, edge-tolerance, spanning-window, alpha/layer, own-process and debounce-flapping cases.
+
+
+## v0.4.0 Creator Studio
+
+Creator Studio is intentionally built around the user's own artwork rather than expanding the random built-in wallpaper set. The first workflow targets Canva exports because images and video map cleanly onto LumaWall's native image/AVFoundation renderers.
+
+The creator model keeps source artwork separate from LumaWall-owned storage. Creating a wallpaper copies the original asset into a generated package under Application Support, writes a v1 wallpaper.json manifest, persists the result in the existing Library index, and leaves the Canva export untouched. Image wallpapers reuse the copied artwork as their card thumbnail unless the creator supplies a separate thumbnail; video wallpapers can generate a preview after import.
+
+Package construction runs in a detached user-initiated task because 4K/60 video files can be large. Only the final Library/model mutation returns to the main actor. This keeps Creator Studio from freezing the SwiftUI control surface during large file copies.
+
+Creator metadata adds optional description, tags, category, version and source fields to wallpaper.json. They are optional so existing v1 packages remain backward compatible. Presentation settings such as fit, video playback and Time/Date overlay remain user-configurable engine state and are applied immediately after creation.
