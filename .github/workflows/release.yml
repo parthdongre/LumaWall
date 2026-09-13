@@ -1,0 +1,65 @@
+name: Release LumaWall
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example 0.3.0"
+        required: true
+        default: "0.3.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test
+        run: |
+          swift build
+          swift test
+
+      - name: Package app, DMG and PKG
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          chmod +x scripts/package-macos.sh
+          ./scripts/package-macos.sh
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LumaWall-${{ steps.version.outputs.version }}-macOS
+          path: |
+            dist/LumaWall.app
+            dist/LumaWall-${{ steps.version.outputs.version }}-macOS.zip
+            dist/LumaWall-${{ steps.version.outputs.version }}.dmg
+            dist/LumaWall-${{ steps.version.outputs.version }}.pkg
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME"             "dist/LumaWall-$VERSION-macOS.zip"             "dist/LumaWall-$VERSION.dmg"             "dist/LumaWall-$VERSION.pkg"             "dist/SHA256SUMS.txt"             --title "LumaWall $VERSION"             --generate-notes

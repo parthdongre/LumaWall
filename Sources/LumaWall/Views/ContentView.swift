@@ -1,7 +1,10 @@
 import SwiftUI
 
 enum SidebarDestination: Hashable {
-  case library, displays, automations
+  case library(LibraryScope)
+  case displays
+  case automations
+  case diagnostics
   case wallpaper(UUID)
 }
 
@@ -11,16 +14,22 @@ struct ContentView: View {
   var body: some View {
     NavigationSplitView {
       List(selection: $model.sidebarSelection) {
-        Section("LumaWall") {
-          Label("Library", systemImage: "square.grid.2x2").tag(SidebarDestination.library)
-          Label("Displays", systemImage: "display.2").tag(SidebarDestination.displays)
-          Label("Playlists & Schedules", systemImage: "clock.arrow.2.circlepath").tag(
-            SidebarDestination.automations)
+        Section("Library") {
+          Label("All Wallpapers", systemImage: "square.grid.2x2")
+            .tag(SidebarDestination.library(.all))
+          Label("Favorites", systemImage: "star")
+            .tag(SidebarDestination.library(.favorites))
+          Label("Recent", systemImage: "clock")
+            .tag(SidebarDestination.library(.recent))
         }
-        Section("Wallpapers") {
-          ForEach(model.wallpapers) { w in
-            Label(w.name, systemImage: icon(w.type)).tag(SidebarDestination.wallpaper(w.id))
-          }
+
+        Section("System") {
+          Label("Displays", systemImage: "display.2")
+            .tag(SidebarDestination.displays)
+          Label("Playlists & Schedules", systemImage: "clock.arrow.2.circlepath")
+            .tag(SidebarDestination.automations)
+          Label("Diagnostics", systemImage: "stethoscope")
+            .tag(SidebarDestination.diagnostics)
         }
       }
       .navigationTitle("LumaWall")
@@ -31,29 +40,50 @@ struct ContentView: View {
       }
     } detail: {
       switch model.sidebarSelection {
-      case .library:
-        LibraryOverviewView(selection: $model.sidebarSelection)
+      case .library(let scope):
+        LibraryOverviewView(scope: scope, selection: $model.sidebarSelection)
       case .displays:
         DisplaysView()
       case .automations:
         AutomationView()
+      case .diagnostics:
+        DiagnosticsView()
       case .wallpaper(let id):
-        if let w = model.wallpapers.first(where: { $0.id == id }) {
-          WallpaperDetailView(wallpaper: w)
+        if let wallpaper = model.wallpapers.first(where: { $0.id == id }) {
+          WallpaperDetailView(wallpaper: wallpaper)
             .onAppear { model.selectedWallpaperID = id }
+        } else {
+          ContentUnavailableView(
+            "Wallpaper unavailable",
+            systemImage: "exclamationmark.triangle"
+          )
         }
       case .none:
-        ContentUnavailableView("Choose a section", systemImage: "sparkles.rectangle.stack")
+        ContentUnavailableView(
+          "Choose a section",
+          systemImage: "sparkles.rectangle.stack"
+        )
       }
     }
-  }
-
-  private func icon(_ type: WallpaperType) -> String {
-    switch type {
-    case .image: return "photo"
-    case .video: return "film"
-    case .web: return "globe"
-    case .metal: return "cpu"
+    .safeAreaInset(edge: .bottom) {
+      if let message = model.statusMessage {
+        HStack(spacing: 8) {
+          Image(systemName: "checkmark.circle.fill")
+          Text(message)
+            .lineLimit(1)
+          Spacer()
+          Button {
+            model.statusMessage = nil
+          } label: {
+            Image(systemName: "xmark")
+          }
+          .buttonStyle(.plain)
+        }
+        .font(.caption)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.regularMaterial)
+      }
     }
   }
 }

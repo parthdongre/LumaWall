@@ -2,7 +2,7 @@
 
 LumaWall is a native macOS live-wallpaper engine inspired by Steam Wallpaper Engine. The project is designed around an extensible renderer boundary so image, video, HTML/JS/WebGL and native Metal wallpapers can share the same display, performance, interaction, audio and creator-property systems.
 
-## v0.2 feature slice
+## v0.3 feature set
 
 Implemented in the current source tree:
 
@@ -28,14 +28,27 @@ Implemented in the current source tree:
 - launch-at-login helper via ServiceManagement
 - local web-wallpaper sandbox with explicit network permission
 
-The community gallery / Workshop is intentionally not part of v0.2. The local package/security model is being stabilized first so a future Workshop has a safe substrate.
+Additional v0.3 product features include searchable/filterable library views, favorites, recents, persistent creator controls, quality presets, Safe Mode, diagnostics, keyboard/menu-bar workflows, and installable macOS package generation.
+
+The community gallery / Workshop remains a later milestone. The local package/security model is intentionally being stabilized before public third-party uploads are accepted.
+
+## Install
+
+Requirements: macOS 14+.
+
+For a normal user build, use the DMG or PKG produced by GitHub Actions. For a local install from source:
+
+```bash
+git clone https://github.com/parthdongre/LumaWall.git
+cd LumaWall
+make install
+```
+
+For development, full Xcode is optional; Apple Command Line Tools are sufficient for `swift run LumaWall`.
 
 ## Quick start
 
-Requirements: macOS 14+. Full Xcode is optional for normal SwiftPM development; Apple Command Line Tools are sufficient for `swift run LumaWall`.
-
-1. Open the repository in Xcode as a Swift Package.
-2. Run the `LumaWall` executable target.
+1. Launch the installed app, or run `swift run LumaWall` from the repository.
 3. Pick from the built-in wallpaper collection (Aurora plus Metal, WebGL, Canvas and audio-reactive designs) and choose **Set Wallpaper**.
 4. Enable system audio in Settings if you want audio-reactive data.
 5. The built-in collection already exercises Metal, WebGL/Canvas, mouse interaction and FFT data; `Examples/WebSpectrum.wall` remains available as an importable creator example.
@@ -59,9 +72,13 @@ MyWallpaper.wall/
 
 See `docs/wallpaper-format.md`, `docs/creator-api.md`, `docs/security.md`, and `steps.md`.
 
+## Distribution
+
+Run `make package` to build `LumaWall.app`, ZIP, DMG, PKG, and SHA-256 checksums. See `docs/distribution.md` for signing and notarization details.
+
 ## Validation
 
-The source tree is parser-validated locally. `.github/workflows/macos-build.yml` runs `swift build` and `swift test` on a macOS runner because Linux cannot link the Apple-only frameworks used by the engine.
+`.github/workflows/macos-build.yml` runs `swift build`, `swift test`, and the installable packaging pipeline on a macOS runner because Linux cannot link the Apple-only frameworks used by the engine.
 
 ## Architecture
 

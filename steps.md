@@ -112,3 +112,28 @@ Wallpaper surfaces now use non-activating `NSPanel` windows instead of ordinary 
 Automatic gallery preview generation was removed from every visible card because creating multiple offscreen WebKit/Metal renderers while SwiftUI mutates the gallery can overlap Core Animation transactions. Preview generation remains available as an explicit/single-item path rather than a burst at launch.
 
 Metal teardown now pauses the `MTKView`, detaches its delegate, waits for the latest command buffer to complete, and only then releases the pipeline/device. Web wallpaper teardown stops navigation and detaches delegates/message handlers. Wallpaper panels are ordered out and their content view detached before the panel itself is closed on the next main-run-loop turn. Assignment restoration is delayed briefly after launch, and normal termination stops active renderers first.
+
+
+## v0.3 productization: library state and controls
+
+Favorites, recent usage, sort order, quality preferences and creator-property values are persisted with `UserDefaults`/Codable because these are small user preferences rather than owned wallpaper assets. The wallpaper library itself remains a JSON index under Application Support.
+
+The sidebar no longer lists every wallpaper. That approach stops scaling once the built-in collection grows. Instead, the sidebar exposes library scopes (All, Favorites, Recent) and the gallery handles renderer-type filters, search and sorting.
+
+Creator controls persist per wallpaper UUID. Applying a wallpaper records it in a bounded recent-history list so the menu bar can provide quick switching without scanning the entire library.
+
+## v0.3 productization: performance presets
+
+Manual FPS/render-scale preferences are now inputs to `PerformanceGovernor`. Previously the governor's two-second evaluation could overwrite a user's 30/120 FPS choice with its default 60 FPS policy. The governor now treats the selected targets as preferred ceilings, reducing them only when adaptive thermal/battery policy requires it. Eco/Balanced/Ultra are convenience presets over the same inputs.
+
+## v0.3 productization: recovery and diagnostics
+
+Safe Mode is intentionally simple: `--safe-mode` or the one-shot next-launch flag skips assignment restoration. It does not disable the UI or library, so users can still diagnose a broken wallpaper, export a report, revoke permissions, or choose a known-good wallpaper.
+
+Diagnostics are generated from runtime state rather than collecting private user data. The report includes LumaWall version, rendering policy, power/thermal state, display assignments, library counts and the last surfaced error.
+
+## v0.3 productization: installable macOS bundle
+
+SwiftPM remains the source build system, while `scripts/package-macos.sh` assembles the release executable and SwiftPM resource bundle into a conventional `.app` layout. The app is ad-hoc signed when no Developer ID is supplied, then packaged into ZIP, DMG and PKG outputs with checksums.
+
+The app bundle registers the `.wall` document type, and AppKit's application delegate forwards Finder-opened wallpaper packages into the existing importer. GitHub Actions performs packaging on macOS after build/tests so distribution errors are caught separately from source compilation.

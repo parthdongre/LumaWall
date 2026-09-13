@@ -1,5 +1,9 @@
 import AppKit
 
+extension Notification.Name {
+  static let lumaWallOpenFiles = Notification.Name("LumaWallOpenFiles")
+}
+
 @MainActor
 final class LumaWallAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -16,6 +20,15 @@ final class LumaWallAppDelegate: NSObject, NSApplicationDelegate {
   ) -> Bool {
     Self.bringControlWindowForward()
     return true
+  }
+
+  func application(_ application: NSApplication, open urls: [URL]) {
+    NotificationCenter.default.post(name: .lumaWallOpenFiles, object: urls)
+    NSApp.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+    DispatchQueue.main.async {
+      Self.bringControlWindowForward()
+    }
   }
 
   static func bringControlWindowForward() {
