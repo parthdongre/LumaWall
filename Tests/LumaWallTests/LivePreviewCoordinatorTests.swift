@@ -11,12 +11,12 @@ func livePreviewActivatesOnlyOneWallpaper() async throws {
   let first = UUID()
   let second = UUID()
 
-  coordinator.hover(first)
-  try await Task.sleep(nanoseconds: 30_000_000)
+  let firstActivation = coordinator.hover(first)
+  await firstActivation?.value
   #expect(coordinator.activeWallpaperID == first)
 
-  coordinator.hover(second)
-  try await Task.sleep(nanoseconds: 30_000_000)
+  let secondActivation = coordinator.hover(second)
+  await secondActivation?.value
   #expect(coordinator.activeWallpaperID == second)
 
   coordinator.leave(second)
@@ -31,12 +31,10 @@ func livePreviewCancelledHoverNeverStartsRenderer() async throws {
 
   let wallpaper = UUID()
 
-  coordinator.hover(wallpaper)
+  let pendingActivation = coordinator.hover(wallpaper)
   coordinator.leave(wallpaper)
 
-  try await Task.sleep(
-    nanoseconds: 70_000_000
-  )
+  await pendingActivation?.value
 
   #expect(coordinator.activeWallpaperID == nil)
 }
