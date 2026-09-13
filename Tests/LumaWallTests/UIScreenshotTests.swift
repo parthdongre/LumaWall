@@ -19,12 +19,14 @@ func captureMacOSUIScreenshots() async throws {
     withIntermediateDirectories: true
   )
 
+  NSApp.appearance = NSAppearance(named: .darkAqua)
   UserDefaults.standard.set(true, forKey: "onboarding.completed")
-  UserDefaults.standard.set(true, forKey: "startup.safeModeNextLaunch")
+  UserDefaults.standard.set(false, forKey: "startup.safeModeNextLaunch")
   UserDefaults.standard.set(false, forKey: "startup.restoreAssignments")
 
   let model = AppModel()
   model.searchText = ""
+  model.statusMessage = nil
 
   for wallpaper in model.wallpapers.prefix(6) {
     await model.ensurePreview(for: wallpaper.id)
@@ -100,7 +102,12 @@ private func capture<V: View>(
   title: String,
   to destination: URL
 ) throws {
-  let contentView = NSHostingView(rootView: rootView)
+  let darkAppearance = NSAppearance(named: .darkAqua)
+  let contentView = NSHostingView(
+    rootView: rootView
+      .environment(\.colorScheme, .dark)
+  )
+  contentView.appearance = darkAppearance
   contentView.frame = NSRect(origin: .zero, size: size)
 
   let window = NSWindow(
@@ -109,6 +116,7 @@ private func capture<V: View>(
     backing: .buffered,
     defer: false
   )
+  window.appearance = darkAppearance
   window.title = title
   window.contentView = contentView
   window.setContentSize(size)
@@ -118,7 +126,7 @@ private func capture<V: View>(
   contentView.layoutSubtreeIfNeeded()
   window.displayIfNeeded()
 
-  for _ in 0..<4 {
+  for _ in 0..<5 {
     RunLoop.main.run(until: Date().addingTimeInterval(0.15))
     contentView.layoutSubtreeIfNeeded()
     window.displayIfNeeded()
