@@ -170,3 +170,12 @@ The previous Metal render-scale code derived `MTKView.drawableSize` from view bo
 `MacHardwareProfile` identifies the current model through `hw.model`, reads the active Metal device name for the Apple chip/GPU, and uses physical memory, processor count and display refresh capability to choose an Automatic FPS target. Resolution remains 100% by default; on battery or thermal pressure the governor reduces FPS before reducing pixel resolution.
 
 Maximum Resolution is a user-visible lock. While enabled, adaptive performance policies keep `renderScale = 1.0`. Users can turn it off to allow lower render scales. Active renderers are also reconfigured when macOS reports display-parameter changes, so connecting a monitor or changing scaling does not require relaunching LumaWall.
+
+
+## Per-display fullscreen suppression
+
+Fullscreen activity is now mapped to individual CoreGraphics display IDs instead of a single global boolean. The foreground application's layer-0 windows are compared with each active display's CoreGraphics bounds; a display is considered occupied when the foreground window covers essentially the whole display.
+
+Fullscreen display IDs are passed separately from the global performance policy. WallpaperEngine pauses only the renderers assigned to those displays, suppresses audio/mouse updates for them, and orders their wallpaper panels out. Other monitors keep rendering normally.
+
+Wallpaper panels no longer use fullScreenAuxiliary, because that collection behavior explicitly permits them to join another application's fullscreen Space. This fixes the case where a browser/YouTube fullscreen window could be visually replaced or covered by the live wallpaper.

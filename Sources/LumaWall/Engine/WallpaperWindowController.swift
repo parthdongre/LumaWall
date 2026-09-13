@@ -15,6 +15,7 @@ final class WallpaperWindowController {
 
   private let window: WallpaperPanel
   private var isClosed = false
+  private var fullscreenSuppressed = false
 
   init(
     display: DisplayDescriptor,
@@ -40,12 +41,16 @@ final class WallpaperWindowController {
     )
 
     window.level = NSWindow.Level(rawValue: wallpaperLevel)
+
+    // The wallpaper belongs on desktop Spaces only. In particular, do not use
+    // .fullScreenAuxiliary: that flag allows our panel to join another app's
+    // fullscreen Space, which can make LumaWall appear over fullscreen video.
     window.collectionBehavior = [
       .canJoinAllSpaces,
       .stationary,
       .ignoresCycle,
-      .fullScreenAuxiliary,
     ]
+
     window.ignoresMouseEvents = true
     window.isOpaque = true
     window.hasShadow = false
@@ -60,11 +65,23 @@ final class WallpaperWindowController {
   }
 
   func show() {
-    guard !isClosed else { return }
-
-    // A wallpaper belongs above macOS's static desktop picture but below Finder
-    // icons and every normal application window. Never force it to the front.
+    guard !isClosed, !fullscreenSuppressed else { return }
     window.orderBack(nil)
+  }
+
+  func setFullscreenSuppressed(_ suppressed: Bool) {
+    guard !isClosed, fullscreenSuppressed != suppressed else { return }
+    fullscreenSuppressed = suppressed
+
+    if suppressed {
+      // Hiding is a second safety layer beyond Space behavior. Even if macOS
+      // changes Space/window ordering, the wallpaper cannot cover fullscreen
+      // content on this display.
+      window.orderOut(nil)
+    } else {
+      window.setFrame(display.screen.frame, display: true)
+      window.orderBack(nil)
+    }
   }
 
   func updateDisplay(_ updatedDisplay: DisplayDescriptor) {
@@ -72,14 +89,20 @@ final class WallpaperWindowController {
     display = updatedDisplay
     renderer.configure(for: updatedDisplay)
     window.setFrame(updatedDisplay.screen.frame, display: true)
-    window.orderBack(nil)
+
+    if !fullscreenSuppressed {
+      window.orderBack(nil)
+    }
   }
 
   func updateFrame() {
     guard !isClosed else { return }
     renderer.configure(for: display)
     window.setFrame(display.screen.frame, display: true)
-    window.orderBack(nil)
+
+    if !fullscreenSuppressed {
+      window.orderBack(nil)
+    }
   }
 
   func close() {
@@ -92,8 +115,6 @@ final class WallpaperWindowController {
     window.orderOut(nil)
     window.contentView = nil
 
-    // Give Core Animation one run-loop turn after the renderer has drained before
-    // releasing the window/CAMetalLayer/WebKit backing hierarchy.
     let retiredWindow = window
     DispatchQueue.main.async {
       retiredWindow.close()

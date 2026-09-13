@@ -55,6 +55,11 @@ struct DiagnosticsView: View {
             value: model.isSafeMode ? "Active" : "Off",
             symbol: "shield"
           )
+          metric(
+            title: "Fullscreen Paused",
+            value: "\(model.engine.fullscreenPausedDisplayIDs.count)",
+            symbol: "rectangle.slash"
+          )
         }
 
         GroupBox("Detected hardware") {
@@ -87,6 +92,15 @@ struct DiagnosticsView: View {
                   )
                   .font(.caption2)
                   .foregroundStyle(.tertiary)
+
+                  if model.engine.fullscreenPausedDisplayIDs.contains(display.id) {
+                    Label(
+                      "Paused for fullscreen app",
+                      systemImage: "pause.circle.fill"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                  }
                 }
                 Spacer()
               }

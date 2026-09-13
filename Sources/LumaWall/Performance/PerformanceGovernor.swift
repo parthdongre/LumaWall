@@ -12,11 +12,14 @@ struct PerformancePolicy: Equatable {
 final class PerformanceGovernor: ObservableObject {
   @Published private(set) var foregroundActivity = ForegroundActivity(
     isFullscreen: false,
+    fullscreenDisplayIDs: [],
     isGame: false,
     ownerName: nil
   )
 
   var onPolicyChanged: ((PerformancePolicy) -> Void)?
+  var onFullscreenDisplaysChanged: ((Set<CGDirectDisplayID>) -> Void)?
+
   @Published var pauseForFullscreen = true
   @Published var pauseForGames = true
   @Published private(set) var adaptiveQualityEnabled = true
@@ -26,20 +29,27 @@ final class PerformanceGovernor: ObservableObject {
 
   private var timer: Timer?
   private var lastPolicy: PerformancePolicy?
+  private var lastFullscreenPauseSet = Set<CGDirectDisplayID>()
   private let monitor = FullscreenMonitor()
 
   func start() {
     monitor.onChanged = { [weak self] activity in
-      self?.foregroundActivity = activity
-      self?.evaluate()
+      guard let self else { return }
+      self.foregroundActivity = activity
+      self.evaluateFullscreenPauses()
+      self.evaluate()
     }
+
     monitor.start()
+
     timer?.invalidate()
     timer = .scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
       Task { @MainActor [weak self] in
         self?.evaluate()
       }
     }
+
+    evaluateFullscreenPauses()
     evaluate()
   }
 
@@ -66,17 +76,30 @@ final class PerformanceGovernor: ObservableObject {
   }
 
   func refresh() {
+    evaluateFullscreenPauses()
     evaluate()
+  }
+
+  private func evaluateFullscreenPauses() {
+    let paused =
+      pauseForFullscreen
+      ? foregroundActivity.fullscreenDisplayIDs
+      : []
+
+    guard paused != lastFullscreenPauseSet else { return }
+    lastFullscreenPauseSet = paused
+    onFullscreenDisplaysChanged?(paused)
   }
 
   private func evaluate() {
     let process = ProcessInfo.processInfo
-    let activityPause =
-      (pauseForFullscreen && foregroundActivity.isFullscreen)
-      || (pauseForGames && foregroundActivity.isGame)
+
+    // Fullscreen pausing is handled per display. Do not globally stop every
+    // wallpaper just because one monitor contains a fullscreen app.
+    let globalActivityPause = pauseForGames && foregroundActivity.isGame
 
     let policy: PerformancePolicy
-    if NSScreen.screens.isEmpty || process.thermalState == .critical || activityPause {
+    if NSScreen.screens.isEmpty || process.thermalState == .critical || globalActivityPause {
       policy = .init(targetFPS: 15, renderScale: 0.5, shouldPause: true)
     } else if adaptiveQualityEnabled
       && (process.isLowPowerModeEnabled || process.thermalState == .serious)

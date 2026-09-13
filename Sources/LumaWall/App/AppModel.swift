@@ -131,6 +131,9 @@ final class AppModel: ObservableObject {
     governor.onPolicyChanged = { [weak self] policy in
       self?.engine.apply(policy: policy)
     }
+    governor.onFullscreenDisplaysChanged = { [weak self] displayIDs in
+      self?.engine.setFullscreenPausedDisplays(displayIDs)
+    }
     governor.start()
 
     audio.onFrame = { [weak self] frame in

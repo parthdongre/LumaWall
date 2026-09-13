@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${VERSION:-0.3.2}"
+VERSION="${VERSION:-0.3.3}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 BUNDLE_ID="${BUNDLE_ID:-dev.parthdongre.LumaWall}"
 DIST="$ROOT/dist"
