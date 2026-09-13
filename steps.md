@@ -271,3 +271,12 @@ This intentionally avoids the older burst-preview design that could create sever
 The first compatibility importer supports only formats that map cleanly onto existing LumaWall renderers: ordinary video projects, local HTML/web projects and static image entries. Scene/particle projects are rejected with an explicit unsupported-type error rather than being presented as compatible.
 
 project.json entry and preview paths are standardized, symlinks are resolved, and every referenced file must remain under the selected project root. The converted project becomes a normal LumaWall v1 package and is persisted through the same library/package validation path as native imports.
+
+
+## Unreleased import UX and developer preflight
+
+The Library now accepts Finder file drops directly. SwiftUI's typed URL drop destination is used instead of custom pasteboard parsing so local files arrive as file URLs and continue through the existing AppModel and WallpaperLibrary import path. That keeps drag-and-drop behavior identical to the Import panel for .wall/.zip packages, loose image/video/web/Metal files, permission prompts, persistence, previews and selection.
+
+Import entry points now share a small WallpaperImportMenu view. It exposes normal wallpaper import, the existing Wallpaper Engine project importer, and Creator Studio without duplicating separate buttons across ContentView and the Library toolbar.
+
+A new `scripts/doctor.sh` preflight checks the exact toolchain pieces LumaWall needs: macOS 14+, a full Xcode developer directory, xcodebuild, Swift, the macOS SDK and `metal`. Make targets for run/build/test/package/install depend on this check. This intentionally does not try to hide a Command Line Tools-only setup because SwiftUI/AppKit builds and runtime Metal shader work require the complete Apple developer toolchain; instead it fails before opaque Swift macro or `metal` spawn errors.
