@@ -28,6 +28,15 @@ final class AppModel: ObservableObject {
   @Published var statusMessage: String?
   @Published var showOnboarding = false
   @Published var onboardingPage = 0
+  @Published var transitionStyle: WallpaperTransitionStyle = .crossfade
+  @Published var transitionDuration = 0.8
+  @Published var displayProfiles: [CGDirectDisplayID: DisplayPerformanceProfile] = [:]
+  @Published var fitModes: [UUID: WallpaperFitMode] = [:]
+  @Published var videoPlaybackSettings: [UUID: VideoPlaybackSettings] = [:]
+  @Published var usePowerProfiles = true
+  @Published var pluggedInProfile = PowerPerformanceProfile.pluggedIn
+  @Published var batteryProfile = PowerPerformanceProfile.battery
+  @Published var lowPowerProfile = PowerPerformanceProfile.lowPower
 
   let engine = WallpaperEngine()
   let governor = PerformanceGovernor()
@@ -35,6 +44,8 @@ final class AppModel: ObservableObject {
   let automation = WallpaperAutomationController()
   let launchAtLogin = LaunchAtLoginController()
   let updater = UpdateService()
+  let power = PowerSourceMonitor()
+  let quarantine = CrashQuarantineService()
   let library: WallpaperLibrary
 
   private var cancellables = Set<AnyCancellable>()
@@ -57,6 +68,15 @@ final class AppModel: ObservableObject {
     static let restoreAssignments = "startup.restoreAssignments"
     static let safeModeNextLaunch = "startup.safeModeNextLaunch"
     static let onboardingCompleted = "onboarding.completed"
+    static let transitionStyle = "rendering.transitionStyle"
+    static let transitionDuration = "rendering.transitionDuration"
+    static let displayProfiles = "rendering.displayProfiles"
+    static let fitModes = "rendering.fitModes"
+    static let videoSettings = "rendering.videoSettings"
+    static let usePowerProfiles = "performance.usePowerProfiles"
+    static let pluggedInProfile = "performance.pluggedInProfile"
+    static let batteryProfile = "performance.batteryProfile"
+    static let lowPowerProfile = "performance.lowPowerProfile"
   }
 
   init() {
@@ -110,6 +130,57 @@ final class AppModel: ObservableObject {
     isSafeMode = requestedSafeMode
     defaults.set(false, forKey: Keys.safeModeNextLaunch)
 
+    transitionStyle =
+      defaults.string(forKey: Keys.transitionStyle)
+        .flatMap(WallpaperTransitionStyle.init(rawValue:))
+      ?? .crossfade
+    transitionDuration =
+      defaults.object(forKey: Keys.transitionDuration) as? Double
+      ?? 0.8
+
+    fitModes = Self.loadFitModes(from: defaults)
+    videoPlaybackSettings = Self.loadVideoSettings(from: defaults)
+    displayProfiles = Self.loadDisplayProfiles(
+      from: defaults,
+      displays: detectedDisplays,
+      fallbackFPS: targetFPS,
+      fallbackScale: renderScale,
+      maximumResolution: maximumResolutionEnabled
+    )
+
+    usePowerProfiles =
+      defaults.object(forKey: Keys.usePowerProfiles) as? Bool
+      ?? true
+    pluggedInProfile =
+      Self.loadPowerProfile(
+        key: Keys.pluggedInProfile,
+        from: defaults
+      ) ?? .pluggedIn
+    batteryProfile =
+      Self.loadPowerProfile(
+        key: Keys.batteryProfile,
+        from: defaults
+      ) ?? .battery
+    lowPowerProfile =
+      Self.loadPowerProfile(
+        key: Keys.lowPowerProfile,
+        from: defaults
+      ) ?? .lowPower
+
+    engine.setTransitionSettings(
+      .init(
+        style: transitionStyle,
+        duration: transitionDuration
+      )
+    )
+    engine.setDisplayProfiles(displayProfiles)
+    for (id, mode) in fitModes {
+      engine.setFitMode(mode, for: id)
+    }
+    for (id, settings) in videoPlaybackSettings {
+      engine.setVideoPlaybackSettings(settings, for: id)
+    }
+
     let savedProperties = Self.loadSavedProperties(from: defaults)
     for wallpaper in wallpapers {
       var values = Dictionary(
@@ -151,6 +222,15 @@ final class AppModel: ObservableObject {
       in: &cancellables)
     updater.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
+    power.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
+      in: &cancellables)
+    power.$snapshot
+      .dropFirst()
+      .sink { [weak self] _ in
+        self?.applyAutomaticPowerProfile()
+      }
+      .store(in: &cancellables)
+    power.start()
 
     NotificationCenter.default.addObserver(
       forName: NSApplication.didChangeScreenParametersNotification,
@@ -161,8 +241,22 @@ final class AppModel: ObservableObject {
         guard let self else { return }
         let updatedDisplays = DisplayManager.connectedDisplays()
         self.displays = updatedDisplays
+
+        for display in updatedDisplays where self.displayProfiles[display.id] == nil {
+          self.displayProfiles[display.id] = DisplayPerformanceProfile(
+            displayID: display.id,
+            targetFPS: min(self.targetFPS, display.maximumFPS),
+            renderScale: self.renderScale,
+            maximumResolution: self.maximumResolutionEnabled,
+            fitMode: .fill
+          )
+        }
+
+        self.saveDisplayProfiles()
+        self.engine.setDisplayProfiles(self.displayProfiles)
         self.engine.refreshDisplays(updatedDisplays)
         self.hardwareProfile = MacHardwareProfile.detect(displays: updatedDisplays)
+
         if self.qualityPreset == .automatic {
           self.applyHardwareRecommendation()
         }
@@ -182,6 +276,53 @@ final class AppModel: ObservableObject {
       }
     }
 
+    NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.willSleepNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        self?.engine.setSystemSuspended(true)
+        if self?.systemAudioEnabled == true {
+          await self?.audio.stop()
+        }
+      }
+    }
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.didWakeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        guard let self else { return }
+        self.engine.setSystemSuspended(false)
+        if self.systemAudioEnabled {
+          try? await self.audio.startSystemAudio()
+        }
+      }
+    }
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.screensDidSleepNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        self?.engine.setSystemSuspended(true)
+      }
+    }
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.screensDidWakeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        self?.engine.setSystemSuspended(false)
+      }
+    }
+
     NotificationCenter.default.addObserver(
       forName: NSApplication.willTerminateNotification,
       object: nil,
@@ -198,6 +339,13 @@ final class AppModel: ObservableObject {
         self.hardwareProfile = self.hardwareProfile.replacingMarketingName(marketingName)
       }
     }
+
+    if !quarantine.quarantinedIDs.isEmpty {
+      statusMessage =
+        "\(quarantine.quarantinedIDs.count) wallpaper(s) are quarantined after repeated crashes."
+    }
+
+    applyAutomaticPowerProfile()
 
     if restoreAssignmentsOnLaunch && !isSafeMode {
       Task { @MainActor [weak self] in
@@ -371,8 +519,10 @@ final class AppModel: ObservableObject {
   }
 
   func shutdown() {
+    quarantine.markCleanShutdown()
     engine.stopAll()
     governor.stop()
+    power.stop()
     if systemAudioEnabled {
       Task { await audio.stop() }
     }
@@ -453,6 +603,13 @@ final class AppModel: ObservableObject {
 
   func applyWallpaper(id: UUID, to displayID: CGDirectDisplayID?) {
     guard let index = wallpapers.firstIndex(where: { $0.id == id }) else { return }
+
+    guard !quarantine.isQuarantined(id) else {
+      statusMessage =
+        "\(wallpapers[index].name) is quarantined after repeated crashes. Re-enable it from Recovery."
+      return
+    }
+
     do {
       let wallpaper = try requestSensitivePermissions(for: wallpapers[index])
       wallpapers[index] = wallpaper
@@ -465,6 +622,12 @@ final class AppModel: ObservableObject {
       selectedWallpaperID = id
       markWallpaperUsed(id)
       saveAssignments()
+      quarantine.recordActiveWallpaperIDs(activeWallpaperIDs)
+      Task { @MainActor [weak self] in
+        try? await Task.sleep(nanoseconds: 60_000_000_000)
+        guard let self, self.activeWallpaperIDs.contains(id) else { return }
+        self.quarantine.markStable([id])
+      }
       statusMessage =
         displayID == nil
         ? "Applied \(wallpaper.name) to all displays"
@@ -486,6 +649,7 @@ final class AppModel: ObservableObject {
 
   func stopAllAndClearAssignments() {
     engine.stopAll()
+    quarantine.recordActiveWallpaperIDs([])
     defaults.removeObject(forKey: "displayAssignments")
     statusMessage = "Stopped all wallpapers and cleared saved display assignments"
   }
@@ -556,6 +720,91 @@ final class AppModel: ObservableObject {
     } else {
       governor.setUserTargets(fps: targetFPS, renderScale: renderScale)
     }
+  }
+
+  func setTransitionStyle(_ style: WallpaperTransitionStyle) {
+    transitionStyle = style
+    defaults.set(style.rawValue, forKey: Keys.transitionStyle)
+    engine.setTransitionSettings(
+      .init(style: style, duration: transitionDuration)
+    )
+  }
+
+  func setTransitionDuration(_ duration: Double) {
+    transitionDuration = min(max(duration, 0), 4)
+    defaults.set(transitionDuration, forKey: Keys.transitionDuration)
+    engine.setTransitionSettings(
+      .init(style: transitionStyle, duration: transitionDuration)
+    )
+  }
+
+  func displayProfile(for display: DisplayDescriptor) -> DisplayPerformanceProfile {
+    displayProfiles[display.id]
+      ?? DisplayPerformanceProfile(
+        displayID: display.id,
+        targetFPS: min(targetFPS, display.maximumFPS),
+        renderScale: renderScale,
+        maximumResolution: maximumResolutionEnabled,
+        fitMode: .fill
+      )
+  }
+
+  func updateDisplayProfile(_ profile: DisplayPerformanceProfile) {
+    displayProfiles[profile.displayID] = profile
+    saveDisplayProfiles()
+    engine.setDisplayProfiles(displayProfiles)
+  }
+
+  func setFitMode(_ mode: WallpaperFitMode, for wallpaperID: UUID) {
+    fitModes[wallpaperID] = mode
+    saveFitModes()
+    engine.setFitMode(mode, for: wallpaperID)
+  }
+
+  func videoSettings(for wallpaperID: UUID) -> VideoPlaybackSettings {
+    videoPlaybackSettings[wallpaperID] ?? .init()
+  }
+
+  func updateVideoSettings(
+    _ settings: VideoPlaybackSettings,
+    for wallpaperID: UUID
+  ) {
+    videoPlaybackSettings[wallpaperID] = settings
+    saveVideoSettings()
+    engine.setVideoPlaybackSettings(settings, for: wallpaperID)
+  }
+
+  func isQuarantined(_ id: UUID) -> Bool {
+    quarantine.isQuarantined(id)
+  }
+
+  func allowQuarantinedWallpaper(_ id: UUID) {
+    quarantine.allowAgain(id)
+    statusMessage = "Wallpaper re-enabled."
+  }
+
+  func setUsePowerProfiles(_ enabled: Bool) {
+    usePowerProfiles = enabled
+    defaults.set(enabled, forKey: Keys.usePowerProfiles)
+    applyAutomaticPowerProfile()
+  }
+
+  func updatePowerProfile(
+    _ profile: PowerPerformanceProfile,
+    for source: MacPowerSource,
+    lowPower: Bool = false
+  ) {
+    if lowPower {
+      lowPowerProfile = profile
+      savePowerProfile(profile, key: Keys.lowPowerProfile)
+    } else if source == .battery {
+      batteryProfile = profile
+      savePowerProfile(profile, key: Keys.batteryProfile)
+    } else {
+      pluggedInProfile = profile
+      savePowerProfile(profile, key: Keys.pluggedInProfile)
+    }
+    applyAutomaticPowerProfile()
   }
 
   func setAdaptiveQualityEnabled(_ enabled: Bool) {
@@ -733,6 +982,31 @@ final class AppModel: ObservableObject {
     defaults.set(recentWallpaperIDs.map(\.uuidString), forKey: Keys.recents)
   }
 
+  private func applyAutomaticPowerProfile() {
+    guard usePowerProfiles, qualityPreset == .automatic else { return }
+
+    let profile: PowerPerformanceProfile
+    if ProcessInfo.processInfo.isLowPowerModeEnabled {
+      profile = lowPowerProfile
+    } else if power.snapshot.source == .battery {
+      profile = batteryProfile
+    } else {
+      profile = pluggedInProfile
+    }
+
+    targetFPS = max(15, min(120, profile.fps))
+    maximumResolutionEnabled = profile.maximumResolution
+    renderScale = profile.maximumResolution
+      ? 1.0
+      : min(max(profile.renderScale, 0.25), 1.0)
+
+    governor.setMaximumResolutionEnabled(maximumResolutionEnabled)
+    governor.setUserTargets(
+      fps: targetFPS,
+      renderScale: renderScale
+    )
+  }
+
   private func restoreAssignments() {
     guard
       let saved = defaults.dictionary(forKey: "displayAssignments") as? [String: String]
@@ -742,7 +1016,8 @@ final class AppModel: ObservableObject {
       guard
         let raw = saved[String(display.id)],
         let id = UUID(uuidString: raw),
-        let wallpaper = wallpapers.first(where: { $0.id == id })
+        let wallpaper = wallpapers.first(where: { $0.id == id }),
+        !quarantine.isQuarantined(id)
       else { continue }
 
       do {
@@ -758,6 +1033,7 @@ final class AppModel: ObservableObject {
   }
 
   private func saveAssignments() {
+    quarantine.recordActiveWallpaperIDs(activeWallpaperIDs)
     let dictionary = engine.assignmentSnapshot.reduce(into: [String: String]()) {
       $0[String($1.key)] = $1.value.uuidString
     }
@@ -770,6 +1046,132 @@ final class AppModel: ObservableObject {
     if let data = try? JSONEncoder().encode(stringKeyed) {
       defaults.set(data, forKey: Keys.propertyValues)
     }
+  }
+
+  private func saveDisplayProfiles() {
+    if let data = try? JSONEncoder().encode(Array(displayProfiles.values)) {
+      defaults.set(data, forKey: Keys.displayProfiles)
+    }
+  }
+
+  private func saveFitModes() {
+    let dictionary = Dictionary(
+      uniqueKeysWithValues: fitModes.map {
+        ($0.key.uuidString, $0.value.rawValue)
+      }
+    )
+    defaults.set(dictionary, forKey: Keys.fitModes)
+  }
+
+  private func saveVideoSettings() {
+    let dictionary = Dictionary(
+      uniqueKeysWithValues: videoPlaybackSettings.map {
+        ($0.key.uuidString, $0.value)
+      }
+    )
+    if let data = try? JSONEncoder().encode(dictionary) {
+      defaults.set(data, forKey: Keys.videoSettings)
+    }
+  }
+
+  private func savePowerProfile(
+    _ profile: PowerPerformanceProfile,
+    key: String
+  ) {
+    if let data = try? JSONEncoder().encode(profile) {
+      defaults.set(data, forKey: key)
+    }
+  }
+
+  private static func loadDisplayProfiles(
+    from defaults: UserDefaults,
+    displays: [DisplayDescriptor],
+    fallbackFPS: Int,
+    fallbackScale: Double,
+    maximumResolution: Bool
+  ) -> [CGDirectDisplayID: DisplayPerformanceProfile] {
+    let saved: [DisplayPerformanceProfile]
+    if let data = defaults.data(forKey: Keys.displayProfiles),
+      let decoded = try? JSONDecoder().decode(
+        [DisplayPerformanceProfile].self,
+        from: data
+      )
+    {
+      saved = decoded
+    } else {
+      saved = []
+    }
+
+    var profiles = Dictionary(
+      uniqueKeysWithValues: saved.map {
+        (CGDirectDisplayID($0.displayID), $0)
+      }
+    )
+
+    for display in displays where profiles[display.id] == nil {
+      profiles[display.id] = DisplayPerformanceProfile(
+        displayID: display.id,
+        targetFPS: min(fallbackFPS, display.maximumFPS),
+        renderScale: fallbackScale,
+        maximumResolution: maximumResolution,
+        fitMode: .fill
+      )
+    }
+
+    return profiles
+  }
+
+  private static func loadFitModes(
+    from defaults: UserDefaults
+  ) -> [UUID: WallpaperFitMode] {
+    guard
+      let dictionary = defaults.dictionary(forKey: Keys.fitModes) as? [String: String]
+    else {
+      return [:]
+    }
+
+    return dictionary.reduce(into: [:]) { result, element in
+      if let id = UUID(uuidString: element.key),
+        let mode = WallpaperFitMode(rawValue: element.value)
+      {
+        result[id] = mode
+      }
+    }
+  }
+
+  private static func loadVideoSettings(
+    from defaults: UserDefaults
+  ) -> [UUID: VideoPlaybackSettings] {
+    guard
+      let data = defaults.data(forKey: Keys.videoSettings),
+      let dictionary = try? JSONDecoder().decode(
+        [String: VideoPlaybackSettings].self,
+        from: data
+      )
+    else {
+      return [:]
+    }
+
+    return dictionary.reduce(into: [:]) { result, element in
+      if let id = UUID(uuidString: element.key) {
+        result[id] = element.value
+      }
+    }
+  }
+
+  private static func loadPowerProfile(
+    key: String,
+    from defaults: UserDefaults
+  ) -> PowerPerformanceProfile? {
+    guard
+      let data = defaults.data(forKey: key)
+    else {
+      return nil
+    }
+    return try? JSONDecoder().decode(
+      PowerPerformanceProfile.self,
+      from: data
+    )
   }
 
   private static func loadSavedProperties(

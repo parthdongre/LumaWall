@@ -1,181 +1,624 @@
 import AppKit
 import WebKit
 
-private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
-  weak var delegate: WKScriptMessageHandler?
+private final class WeakScriptMessageHandler:
+  NSObject,
+  WKScriptMessageHandler
+{
+  weak var delegate:
+    WKScriptMessageHandler?
+
   func userContentController(
-    _ userContentController: WKUserContentController,
-    didReceive message: WKScriptMessage
+    _ userContentController:
+      WKUserContentController,
+    didReceive message:
+      WKScriptMessage
   ) {
-    delegate?.userContentController(userContentController, didReceive: message)
+    delegate?
+      .userContentController(
+        userContentController,
+        didReceive: message
+      )
   }
 }
 
 @MainActor
-final class WebWallpaperRenderer: NSObject, WallpaperRenderer, WKScriptMessageHandler,
+final class WebWallpaperRenderer:
+  NSObject,
+  WallpaperRenderer,
+  WKScriptMessageHandler,
   WKNavigationDelegate
 {
-  private let webView: WKWebView
-  private let messageProxy: WeakScriptMessageHandler
+  private let webView:
+    WKWebView
+
+  private let messageProxy:
+    WeakScriptMessageHandler
+
   private var loaded = false
   private var allowNetwork = false
   private var paused = false
   private var fps = 60
   private var renderScale = 1.0
-  private var interaction = InteractionState(normalizedMouse: CGPoint(x: 0.5, y: 0.5))
-  private var audio = AudioFrame.zero
-  private var properties: [String: WallpaperPropertyValue] = [:]
-  private var displayInfo: [String: Any] = [:]
+  private var fitMode:
+    WallpaperFitMode = .fill
 
-  var view: NSView { webView }
+  private var interaction =
+    InteractionState(
+      normalizedMouse:
+        CGPoint(
+          x: 0.5,
+          y: 0.5
+        )
+    )
+
+  private var audio =
+    AudioFrame.zero
+
+  private var properties:
+    [String:
+      WallpaperPropertyValue] = [:]
+
+  private var displayInfo:
+    [String: Any] = [:]
+
+  private var pixelSize =
+    CGSize.zero
+
+  var view: NSView {
+    webView
+  }
+
+  var diagnostics:
+    RendererDiagnostics
+  {
+    RendererDiagnostics(
+      rendererName:
+        "Web / WebGL",
+      preferredFPS:
+        fps,
+      renderScale:
+        renderScale,
+      pixelWidth:
+        Int(
+          pixelSize.width
+            * renderScale
+        ),
+      pixelHeight:
+        Int(
+          pixelSize.height
+            * renderScale
+        ),
+      playbackRate: nil,
+      muted: nil
+    )
+  }
 
   override init() {
-    let config = WebSecurityPolicy.baseConfiguration()
-    let proxy = WeakScriptMessageHandler()
-    config.userContentController.add(proxy, name: "lumawall")
+    let config =
+      WebSecurityPolicy
+        .baseConfiguration()
+
+    let proxy =
+      WeakScriptMessageHandler()
+
+    config
+      .userContentController
+      .add(
+        proxy,
+        name: "lumawall"
+      )
+
     messageProxy = proxy
-    webView = WKWebView(frame: .zero, configuration: config)
-    webView.setValue(false, forKey: "drawsBackground")
+
+    webView =
+      WKWebView(
+        frame: .zero,
+        configuration:
+          config
+      )
+
+    webView.setValue(
+      false,
+      forKey:
+        "drawsBackground"
+    )
+
     super.init()
+
     proxy.delegate = self
-    webView.navigationDelegate = self
+    webView.navigationDelegate =
+      self
   }
 
-  func configure(for display: DisplayDescriptor) {
-    webView.layer?.contentsScale = display.backingScaleFactor
+  func configure(
+    for display:
+      DisplayDescriptor
+  ) {
+    pixelSize =
+      display.nativePixelSize
+
+    webView.layer?
+      .contentsScale =
+      display.backingScaleFactor
+
     displayInfo = [
-      "pixelWidth": Int(display.nativePixelSize.width),
-      "pixelHeight": Int(display.nativePixelSize.height),
-      "scaleFactor": display.backingScaleFactor,
-      "maximumFPS": display.maximumFPS,
+      "pixelWidth":
+        Int(
+          display
+            .nativePixelSize
+            .width
+        ),
+      "pixelHeight":
+        Int(
+          display
+            .nativePixelSize
+            .height
+        ),
+      "logicalWidth":
+        Int(
+          display
+            .logicalPointSize
+            .width
+        ),
+      "logicalHeight":
+        Int(
+          display
+            .logicalPointSize
+            .height
+        ),
+      "scaleFactor":
+        display
+          .backingScaleFactor,
+      "maximumFPS":
+        display.maximumFPS,
+      "supportsEDR":
+        display.supportsEDR,
+      "maximumEDR":
+        display.maximumEDR,
+      "builtIn":
+        display.isBuiltIn,
     ]
+
+    send(
+      "display",
+      payload:
+        displayInfo
+    )
   }
 
-  func load(_ wallpaper: Wallpaper) throws {
+  func load(
+    _ wallpaper:
+      Wallpaper
+  ) throws {
     loaded = false
-    allowNetwork = wallpaper.grantedPermissions.contains(.network)
-    let access = wallpaper.entryURL.deletingLastPathComponent()
+
+    allowNetwork =
+      wallpaper
+        .grantedPermissions
+        .contains(
+          .network
+        )
+
+    let access =
+      wallpaper
+        .entryURL
+        .deletingLastPathComponent()
+
     if allowNetwork {
-      webView.loadFileURL(wallpaper.entryURL, allowingReadAccessTo: access)
+      webView.loadFileURL(
+        wallpaper.entryURL,
+        allowingReadAccessTo:
+          access
+      )
     } else {
-      WebSecurityPolicy.installNetworkBlocker(on: webView.configuration.userContentController) {
-        [weak self] ok in
-        Task { @MainActor in
-          guard let self else { return }
-          if ok {
-            self.webView.loadFileURL(wallpaper.entryURL, allowingReadAccessTo: access)
-          } else {
-            self.webView.loadHTMLString(
-              "<h3>LumaWall blocked this wallpaper because its network sandbox could not be initialized.</h3>",
-              baseURL: nil
-            )
+      WebSecurityPolicy
+        .installNetworkBlocker(
+          on:
+            webView
+              .configuration
+              .userContentController
+        ) {
+          [weak self] ok in
+          Task {
+            @MainActor in
+            guard let self
+            else {
+              return
+            }
+
+            if ok {
+              self.webView
+                .loadFileURL(
+                  wallpaper.entryURL,
+                  allowingReadAccessTo:
+                    access
+                )
+            } else {
+              self.webView
+                .loadHTMLString(
+                  """
+                  <style>
+                  body{
+                    font-family:-apple-system;
+                    background:#090b10;
+                    color:#fff;
+                    padding:40px
+                  }
+                  </style>
+                  <h3>LumaWall blocked this wallpaper</h3>
+                  <p>The local network sandbox could not be initialized.</p>
+                  """,
+                  baseURL: nil
+                )
+            }
           }
         }
-      }
     }
   }
 
   func play() {
     paused = false
-    send("resume", payload: NSNull())
+    send(
+      "resume",
+      payload:
+        NSNull()
+    )
   }
+
   func pause() {
     paused = true
-    send("pause", payload: NSNull())
+    send(
+      "pause",
+      payload:
+        NSNull()
+    )
   }
+
   func stop() {
     loaded = false
     paused = true
+
     webView.stopLoading()
-    webView.navigationDelegate = nil
-    webView.configuration.userContentController.removeScriptMessageHandler(forName: "lumawall")
-    messageProxy.delegate = nil
+
+    webView.navigationDelegate =
+      nil
+
+    webView
+      .configuration
+      .userContentController
+      .removeScriptMessageHandler(
+        forName:
+          "lumawall"
+      )
+
+    messageProxy.delegate =
+      nil
   }
-  func setFPS(_ fps: Int) {
-    self.fps = fps
-    send("fps", payload: fps)
+
+  func setFPS(
+    _ fps: Int
+  ) {
+    self.fps =
+      max(
+        1,
+        fps
+      )
+
+    send(
+      "fps",
+      payload:
+        self.fps
+    )
   }
-  func setRenderScale(_ scale: Double) {
-    renderScale = scale
-    send("scale", payload: scale)
+
+  func setRenderScale(
+    _ scale: Double
+  ) {
+    renderScale =
+      min(
+        max(
+          scale,
+          0.25
+        ),
+        1
+      )
+
+    send(
+      "scale",
+      payload:
+        renderScale
+    )
   }
-  func updateInteraction(_ state: InteractionState) {
+
+  func setFitMode(
+    _ mode:
+      WallpaperFitMode
+  ) {
+    fitMode = mode
+
+    send(
+      "fit",
+      payload:
+        mode.rawValue
+    )
+  }
+
+  func updateInteraction(
+    _ state:
+      InteractionState
+  ) {
     interaction = state
+
     send(
       "mouse",
       payload: [
-        "x": state.normalizedMouse.x,
-        "y": state.normalizedMouse.y,
-        "primaryDown": state.primaryDown,
-        "secondaryDown": state.secondaryDown,
+        "x":
+          state
+            .normalizedMouse
+            .x,
+        "y":
+          state
+            .normalizedMouse
+            .y,
+        "primaryDown":
+          state
+            .primaryDown,
+        "secondaryDown":
+          state
+            .secondaryDown,
+        "velocityX":
+          state
+            .mouseVelocity
+            .dx,
+        "velocityY":
+          state
+            .mouseVelocity
+            .dy,
+        "scrollX":
+          state
+            .scrollDelta
+            .dx,
+        "scrollY":
+          state
+            .scrollDelta
+            .dy,
+        "timestamp":
+          state.timestamp,
+      ]
+    )
+
+    let date = Date()
+
+    let calendar =
+      Calendar.current
+
+    send(
+      "environment",
+      payload: [
+        "hour":
+          calendar
+            .component(
+              .hour,
+              from: date
+            ),
+        "minute":
+          calendar
+            .component(
+              .minute,
+              from: date
+            ),
+        "weekday":
+          calendar
+            .component(
+              .weekday,
+              from: date
+            ),
+        "timeInterval":
+          date
+            .timeIntervalSince1970,
       ]
     )
   }
-  func updateAudio(_ frame: AudioFrame) {
+
+  func updateAudio(
+    _ frame:
+      AudioFrame
+  ) {
     audio = frame
-    send("audio", payload: frame.jsonObject)
-  }
-  func setProperties(_ properties: [String: WallpaperPropertyValue]) {
-    self.properties = properties
-    send("properties", payload: properties.mapValues(\.jsonObject))
+
+    send(
+      "audio",
+      payload:
+        frame.jsonObject
+    )
   }
 
-  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+  func setProperties(
+    _ properties:
+      [String:
+        WallpaperPropertyValue]
+  ) {
+    self.properties =
+      properties
+
+    send(
+      "properties",
+      payload:
+        properties
+          .mapValues(
+            \.jsonObject
+          )
+    )
+  }
+
+  func webView(
+    _ webView: WKWebView,
+    didFinish navigation:
+      WKNavigation!
+  ) {
     loaded = true
     flushState()
   }
 
   func userContentController(
-    _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
-  ) {
-    // Deliberately no privileged creator actions in v0.2. The channel exists for future
-    // allow-listed commands such as logging and creator diagnostics.
-  }
+    _ userContentController:
+      WKUserContentController,
+    didReceive message:
+      WKScriptMessage
+  ) {}
 
   func webView(
-    _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-    decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+    _ webView: WKWebView,
+    decidePolicyFor
+      navigationAction:
+        WKNavigationAction,
+    decisionHandler:
+      @escaping
+      @MainActor
+      @Sendable
+      (
+        WKNavigationActionPolicy
+      ) -> Void
   ) {
-    guard let url = navigationAction.request.url else {
-      decisionHandler(.cancel)
+    guard
+      let url =
+        navigationAction
+          .request
+          .url
+    else {
+      decisionHandler(
+        .cancel
+      )
       return
     }
-    if url.isFileURL || url.scheme == "about" {
-      decisionHandler(.allow)
+
+    if url.isFileURL
+      || url.scheme
+        == "about"
+    {
+      decisionHandler(
+        .allow
+      )
       return
     }
-    // Remote subresources may be allowed by the package permission, but top-level
-    // navigation away from the local wallpaper is never allowed.
-    decisionHandler(.cancel)
+
+    decisionHandler(
+      .cancel
+    )
   }
 
   private func flushState() {
-    send("display", payload: displayInfo)
-    send("fps", payload: fps)
-    send("scale", payload: renderScale)
     send(
-      "mouse", payload: ["x": interaction.normalizedMouse.x, "y": interaction.normalizedMouse.y])
-    send("audio", payload: audio.jsonObject)
-    send("properties", payload: properties.mapValues(\.jsonObject))
-    send(paused ? "pause" : "resume", payload: NSNull())
+      "display",
+      payload:
+        displayInfo
+    )
+
+    send(
+      "fps",
+      payload:
+        fps
+    )
+
+    send(
+      "scale",
+      payload:
+        renderScale
+    )
+
+    send(
+      "fit",
+      payload:
+        fitMode.rawValue
+    )
+
+    updateInteraction(
+      interaction
+    )
+
+    send(
+      "audio",
+      payload:
+        audio.jsonObject
+    )
+
+    send(
+      "properties",
+      payload:
+        properties
+          .mapValues(
+            \.jsonObject
+          )
+    )
+
+    send(
+      paused
+        ? "pause"
+        : "resume",
+      payload:
+        NSNull()
+    )
   }
 
-  private func send(_ type: String, payload: Any) {
-    guard loaded else { return }
-    let object: [String: Any] = ["type": type, "payload": payload]
-    guard let data = try? JSONSerialization.data(withJSONObject: object),
-      let json = String(data: data, encoding: .utf8)
-    else { return }
-    webView.evaluateJavaScript("window.LumaWall?._receive(\(json).type, \(json).payload)")
+  private func send(
+    _ type: String,
+    payload: Any
+  ) {
+    guard loaded else {
+      return
+    }
+
+    let object:
+      [String: Any] = [
+        "type": type,
+        "payload": payload,
+      ]
+
+    guard
+      let data =
+        try?
+        JSONSerialization
+          .data(
+            withJSONObject:
+              object
+          ),
+      let json =
+        String(
+          data: data,
+          encoding:
+            .utf8
+        )
+    else {
+      return
+    }
+
+    webView
+      .evaluateJavaScript(
+        "window.LumaWall?._receive(\(json).type, \(json).payload)"
+      )
   }
 }
 
 extension WallpaperPropertyValue {
-  fileprivate var jsonObject: Any {
+  fileprivate var jsonObject:
+    Any
+  {
     switch self {
-    case .number(let value): return value
-    case .bool(let value): return value
-    case .string(let value): return value
+    case .number(
+      let value
+    ):
+      return value
+
+    case .bool(
+      let value
+    ):
+      return value
+
+    case .string(
+      let value
+    ):
+      return value
     }
   }
 }
