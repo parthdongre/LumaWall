@@ -130,6 +130,7 @@ DISPLAY POLICY    independent per monitor
 git clone https://github.com/parthdongre/LumaWall.git
 cd LumaWall
 
+make doctor
 make run
 ```
 
@@ -169,15 +170,21 @@ make install
 
 <br/>
 
-LumaWall's Metal shaders require the full Xcode developer toolchain.
+LumaWall's SwiftUI/AppKit build and runtime Metal shader compiler require the full Xcode developer toolchain. Run the built-in environment check first:
+
+```bash
+make doctor
+```
+
+If Command Line Tools are selected, switch to full Xcode:
 
 ```bash
 sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
 xcodebuild -version
-xcrun -f metal
+xcrun --sdk macosx --find metal
 ```
 
-Then rebuild LumaWall.
+Then rerun `make doctor` and launch LumaWall.
 
 </details>
 
@@ -309,6 +316,7 @@ Sources/LumaWall/
 ## ⌘ Development
 
 ```bash
+make doctor    # verify Xcode, Swift, Metal and macOS SDK
 make run       # launch
 make build     # compile
 make test      # test
