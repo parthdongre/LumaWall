@@ -20,7 +20,10 @@ struct SettingsView: View {
       Section("Audio reactive wallpapers") {
         Toggle(
           "Capture system audio",
-          isOn: Binding(get: { model.systemAudioEnabled }, set: model.setSystemAudioEnabled))
+          isOn: Binding(
+            get: { model.systemAudioEnabled },
+            set: { enabled in model.setSystemAudioEnabled(enabled) }
+          ))
         Text("Uses ScreenCaptureKit and excludes LumaWall's own process audio.").foregroundStyle(
           .secondary)
       }

@@ -17,7 +17,10 @@ struct MenuBarView: View {
       }
       Toggle(
         "System audio",
-        isOn: Binding(get: { model.systemAudioEnabled }, set: model.setSystemAudioEnabled))
+        isOn: Binding(
+          get: { model.systemAudioEnabled },
+          set: { enabled in model.setSystemAudioEnabled(enabled) }
+        ))
       Divider()
       Button("Open LumaWall") { NSApp.activate(ignoringOtherApps: true) }
       Button("Quit") { NSApp.terminate(nil) }
