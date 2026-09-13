@@ -12,14 +12,15 @@ final class LivePreviewCoordinator: ObservableObject {
     self.hoverDelayNanoseconds = hoverDelayNanoseconds
   }
 
-  func hover(_ wallpaperID: UUID) {
+  @discardableResult
+  func hover(_ wallpaperID: UUID) -> Task<Void, Never>? {
     if activeWallpaperID == wallpaperID {
-      return
+      return nil
     }
 
     pendingTask?.cancel()
 
-    pendingTask = Task { @MainActor [weak self] in
+    let task = Task { @MainActor [weak self] in
       guard let self else { return }
 
       do {
@@ -33,6 +34,9 @@ final class LivePreviewCoordinator: ObservableObject {
       guard !Task.isCancelled else { return }
       activeWallpaperID = wallpaperID
     }
+
+    pendingTask = task
+    return task
   }
 
   func leave(_ wallpaperID: UUID) {
