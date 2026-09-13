@@ -142,6 +142,15 @@ func captureMacOSUIScreenshots() async throws {
     to: output.appendingPathComponent("09-lock-screen-companion.png")
   )
 
+  model.sidebarSelection = .discover
+  try capture(
+    ContentView()
+      .environmentObject(model),
+    size: NSSize(width: 1440, height: 900),
+    title: "LumaWall",
+    to: output.appendingPathComponent("10-discover.png")
+  )
+
   model.shutdown()
 }
 

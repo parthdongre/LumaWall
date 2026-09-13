@@ -233,3 +233,12 @@ PreviewGenerator now exposes a reusable still-render path with an arbitrary targ
 LockScreenCompositionGeometry owns Fill/Fit/Stretch/Center math independently of AppKit drawing so it can be regression-tested. The generated image can apply Gaussian blur, dimming, saturation and vignette after the wallpaper is composed. The wallpaper's native Time & Date overlay can optionally be drawn into the final bitmap using the same positioning settings.
 
 The default source is the currently assigned wallpaper for each display, with a fallback wallpaper when no assignment exists. Auto-refresh is optional and debounced by 1.25 seconds to avoid repeatedly rendering large 4K/5K/6K images while a user changes several controls or reconnects monitors.
+
+
+## v0.4.0 Discover catalog
+
+Discover is deliberately not populated with third-party or random wallpapers. It starts empty and accepts either a local catalog JSON or an HTTPS catalog endpoint controlled by the user/project. This keeps the product direction aligned with the custom Canva collection rather than turning the app into an uncontrolled scrape of other wallpaper libraries.
+
+Remote catalog and package URLs must use HTTPS. A listing may provide a SHA-256 digest; when present, the downloaded .wall archive is hashed in 1 MB chunks before import and rejected on mismatch. The archive then passes through the existing .wall traversal/path validation before being copied into LumaWall-owned storage.
+
+The service uses URLSession download tasks so large packages are written to a temporary file rather than held in memory, with a 1 GB catalog-install ceiling. The UI exposes search, category filtering, featured/type badges and explicit install progress. Local JSON catalogs can be opened for development without requiring a server.

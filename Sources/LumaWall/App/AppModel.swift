@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import CoreGraphics
 import Foundation
+import UniformTypeIdentifiers
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -44,6 +45,7 @@ final class AppModel: ObservableObject {
   @Published var lockScreenSettings = LockScreenCompanionSettings.defaultComposition
   @Published private(set) var lockScreenSnapshots: [LockScreenSnapshot] = []
   @Published private(set) var lockScreenIsGenerating = false
+  @Published var discoverInstallingWallpaperID: UUID?
 
   let engine = WallpaperEngine()
   let governor = PerformanceGovernor()
@@ -54,6 +56,7 @@ final class AppModel: ObservableObject {
   let power = PowerSourceMonitor()
   let quarantine = CrashQuarantineService()
   let lockScreen = LockScreenSnapshotService()
+  let discover = DiscoverCatalogService()
   let library: WallpaperLibrary
 
   private var cancellables = Set<AnyCancellable>()
@@ -247,6 +250,8 @@ final class AppModel: ObservableObject {
       in: &cancellables)
     power.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
+    discover.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
+      in: &cancellables)
     power.$snapshot
       .dropFirst()
       .sink { [weak self] _ in
@@ -254,6 +259,12 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
     power.start()
+
+    if !discover.endpointString.isEmpty {
+      Task { @MainActor [weak self] in
+        await self?.discover.refresh()
+      }
+    }
 
     NotificationCenter.default.addObserver(
       forName: NSApplication.didChangeScreenParametersNotification,
@@ -1118,6 +1129,80 @@ final class AppModel: ObservableObject {
       }
     } catch {
       show(error)
+    }
+  }
+
+  func setDiscoverEndpoint(_ value: String) {
+    discover.setEndpoint(value)
+  }
+
+  func refreshDiscover() {
+    Task { @MainActor [weak self] in
+      await self?.discover.refresh()
+    }
+  }
+
+  func chooseLocalDiscoverCatalog() {
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    panel.allowsMultipleSelection = false
+    panel.allowedContentTypes = [.json]
+    panel.prompt = "Open Catalog"
+
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+
+    do {
+      try discover.loadLocalCatalog(from: url)
+      statusMessage = "Loaded curated Discover catalog"
+    } catch {
+      show(error)
+    }
+  }
+
+  func installDiscoverWallpaper(
+    _ listing: DiscoverWallpaperListing
+  ) {
+    guard discoverInstallingWallpaperID == nil else { return }
+
+    discoverInstallingWallpaperID = listing.id
+
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+
+      defer {
+        self.discoverInstallingWallpaperID = nil
+      }
+
+      var downloadedURL: URL?
+
+      do {
+        let package = try await self.discover.download(listing)
+        downloadedURL = package
+
+        var wallpaper = try self.library.importWallpaper(from: package)
+
+        if wallpaper.thumbnailURL == nil {
+          wallpaper = await self.library.generatePreviewIfNeeded(for: wallpaper)
+        }
+
+        self.wallpapers.removeAll(where: { $0.id == wallpaper.id })
+        self.wallpapers.append(wallpaper)
+        self.propertyValues[wallpaper.id] = Dictionary(
+          uniqueKeysWithValues: wallpaper.properties.map {
+            ($0.id, $0.defaultValue)
+          }
+        )
+        self.selectedWallpaperID = wallpaper.id
+        self.sidebarSelection = .wallpaper(wallpaper.id)
+        self.statusMessage = "Installed \(wallpaper.name)"
+      } catch {
+        self.show(error)
+      }
+
+      if let downloadedURL {
+        try? FileManager.default.removeItem(at: downloadedURL)
+      }
     }
   }
 

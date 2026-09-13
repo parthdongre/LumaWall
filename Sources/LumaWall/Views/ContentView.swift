@@ -2,6 +2,7 @@ import SwiftUI
 
 enum SidebarDestination: Hashable {
   case library(LibraryScope)
+  case discover
   case displays
   case automations
   case creator
@@ -20,6 +21,8 @@ struct ContentView: View {
         Section("Library") {
           Label("All Wallpapers", systemImage: "square.grid.2x2")
             .tag(SidebarDestination.library(.all))
+          Label("Discover", systemImage: "sparkles")
+            .tag(SidebarDestination.discover)
           Label("Favorites", systemImage: "star")
             .tag(SidebarDestination.library(.favorites))
           Label("Recent", systemImage: "clock")
@@ -54,6 +57,8 @@ struct ContentView: View {
       switch model.sidebarSelection {
       case .library(let scope):
         LibraryOverviewView(scope: scope, selection: $model.sidebarSelection)
+      case .discover:
+        DiscoverView()
       case .displays:
         DisplaysView()
       case .automations:

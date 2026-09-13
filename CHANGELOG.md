@@ -2,6 +2,12 @@
 
 ## 0.4.0 - Creator Studio
 
+- Added Discover as a curated catalog that is intentionally empty until the user supplies a catalog they control.
+- Remote catalogs and wallpaper downloads require HTTPS.
+- Discover supports optional per-package SHA-256 verification before handing the package to LumaWall's existing traversal-safe .wall importer.
+- Added category/search filtering, featured/type badges, local catalog JSON loading, install progress and catalog refresh state.
+- Discover downloads are capped at 1 GB and streamed through a temporary file rather than loaded into memory.
+
 - Added Lock Screen Companion with per-display native-resolution snapshot generation.
 - Lock compositions support Fill/Fit/Stretch/Center, blur, dimming, saturation and vignette.
 - Lock Screen Companion can reuse each wallpaper's native Time & Date overlay and active per-display assignments.
