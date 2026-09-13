@@ -183,9 +183,21 @@ final class WallpaperLibrary {
   }
 
   private func bundledAurora() -> Wallpaper? {
+    let candidates: [URL?] = [
+      Bundle.module.url(
+        forResource: "Aurora", withExtension: "metal", subdirectory: "Shaders"),
+      Bundle.module.url(
+        forResource: "Aurora", withExtension: "metal", subdirectory: "Resources/Shaders"),
+      Bundle.module.resourceURL?
+        .appendingPathComponent("Resources", isDirectory: true)
+        .appendingPathComponent("Shaders", isDirectory: true)
+        .appendingPathComponent("Aurora.metal"),
+    ]
+
     guard
-      let shaderURL = Bundle.module.url(
-        forResource: "Aurora", withExtension: "metal", subdirectory: "Shaders")
+      let shaderURL = candidates
+        .compactMap({ $0 })
+        .first(where: { fileManager.fileExists(atPath: $0.path) })
     else { return nil }
 
     return Wallpaper(

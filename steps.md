@@ -91,3 +91,8 @@ SwiftPM treats processed `.metal` resources as build-time Metal sources and invo
 ## Command Line Tools macro compatibility
 
 A Command Line Tools-only Swift toolchain may provide the macOS SDK frameworks without shipping the separate `SwiftDataMacros` and `SwiftUIMacros` compiler plugins. LumaWall therefore does not require SwiftData macros for its local wallpaper index and does not use `@State` for sidebar selection. Imported wallpaper metadata is stored as Codable JSON under Application Support, and navigation selection lives in `AppModel` as ordinary Combine-published state. This keeps the app runnable with a lightweight CLT installation while preserving the same library behavior.
+
+
+## Bundled resource lookup after CLT compatibility change
+
+After changing SwiftPM resources from `.process("Resources")` to `.copy("Resources")`, the bundle keeps the top-level `Resources` directory. Built-in wallpaper lookup now checks both processed-resource and copied-resource layouts, and CI includes a regression test that verifies the bundled Aurora wallpaper is discoverable.
