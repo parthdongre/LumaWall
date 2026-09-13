@@ -257,3 +257,17 @@ Automation now supports state-based wallpaper rules in addition to playlists and
 Rules are AND-composed, ranked by integer priority and evaluated from a small context supplied by AppModel. Only the highest-priority matching rule is active, and its wallpaper is requested only when that active rule changes. This avoids multiple matching rules fighting on every polling interval.
 
 Schedule, playlist and smart-rule timers use the common main run-loop mode so Dock/menu/window tracking cannot freeze automation state.
+
+## v0.4.0 safe live previews
+
+The gallery now supports delayed hover previews through a single LivePreviewCoordinator. Only one wallpaper ID may own the live-preview slot at a time. A 450 ms hover delay prevents accidental renderer churn while moving the pointer across the grid, and leaving a card cancels pending work immediately.
+
+The preview surface uses the same renderer factory as desktop wallpapers, but caps the renderer at 30 FPS and a 0.35 render scale. NSViewRepresentable dismantling explicitly pauses/stops the renderer and detaches its view. macOS Low Power Mode disables live preview activation, and users can turn the feature off entirely in Settings.
+
+This intentionally avoids the older burst-preview design that could create several WebKit/Metal/Core Animation surfaces during SwiftUI gallery mutation.
+
+## v0.4.0 Wallpaper Engine compatibility importer
+
+The first compatibility importer supports only formats that map cleanly onto existing LumaWall renderers: ordinary video projects, local HTML/web projects and static image entries. Scene/particle projects are rejected with an explicit unsupported-type error rather than being presented as compatible.
+
+project.json entry and preview paths are standardized, symlinks are resolved, and every referenced file must remain under the selected project root. The converted project becomes a normal LumaWall v1 package and is persisted through the same library/package validation path as native imports.

@@ -84,8 +84,29 @@ struct LibraryOverviewView: View {
       } label: {
         VStack(alignment: .leading, spacing: 10) {
           ZStack(alignment: .bottomLeading) {
-            WallpaperThumbnail(wallpaper: wallpaper)
+            LiveWallpaperPreview(
+              wallpaper: wallpaper,
+              active:
+                model.livePreviewsEnabled
+                && !ProcessInfo.processInfo.isLowPowerModeEnabled
+                && model.livePreview.activeWallpaperID == wallpaper.id
+            )
               .aspectRatio(16 / 9, contentMode: .fit)
+              .onHover { hovering in
+                guard
+                  model.livePreviewsEnabled,
+                  !ProcessInfo.processInfo.isLowPowerModeEnabled
+                else {
+                  model.livePreview.leave(wallpaper.id)
+                  return
+                }
+
+                if hovering {
+                  model.livePreview.hover(wallpaper.id)
+                } else {
+                  model.livePreview.leave(wallpaper.id)
+                }
+              }
 
             HStack(spacing: 6) {
               badge(

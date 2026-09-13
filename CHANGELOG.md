@@ -2,6 +2,12 @@
 
 ## 0.4.0 - Creator Studio
 
+- Added safe live previews to Library cards with a hover delay, one renderer at a time, 30 FPS cap and reduced render scale.
+- Live previews are disabled while macOS Low Power Mode is active and can be disabled completely from Settings.
+- Added simple Wallpaper Engine compatibility import for video, web and static-image projects that expose a local project.json.
+- Wallpaper Engine Scene projects and WebM video are explicitly rejected instead of being partially or incorrectly imported.
+- Compatibility import resolves symlinks and blocks project entry/preview paths that escape the selected project folder.
+
 - Added real Metal renderer telemetry: measured FPS, average frame time, estimated drop ratio and load class.
 - Added an opt-in workload-aware adaptive renderer controller with hysteresis so transient frame dips do not immediately reduce quality.
 - Added Smart Rules for battery thresholds, charging state, Low Power Mode, external displays, dark/light mode, weekdays and overnight time ranges.

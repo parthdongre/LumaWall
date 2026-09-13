@@ -301,6 +301,20 @@ struct SettingsView: View {
         )
 
         Toggle(
+          "Live wallpaper previews in Library",
+          isOn: Binding(
+            get: { model.livePreviewsEnabled },
+            set: { model.setLivePreviewsEnabled($0) }
+          )
+        )
+
+        Text(
+          "Live previews are delayed, limited to one renderer at a time, capped at 30 FPS and disabled while macOS Low Power Mode is active."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+
+        Toggle(
           "Experimental workload-aware adaptation",
           isOn: Binding(
             get: { model.governor.experimentalLoadAdaptationEnabled },

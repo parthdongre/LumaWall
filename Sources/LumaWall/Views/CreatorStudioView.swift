@@ -40,6 +40,19 @@ struct CreatorStudioView: View {
         badge("PNG / JPG / HEIC / WebP", symbol: "photo")
         badge("MP4 / MOV / M4V", symbol: "film")
         badge(".wall export", symbol: "shippingbox")
+
+        Spacer()
+
+        Button {
+          model.chooseWallpaperEngineProject()
+        } label: {
+          Label(
+            "Import Wallpaper Engine Project",
+            systemImage: "arrow.triangle.2.circlepath"
+          )
+        }
+        .buttonStyle(.bordered)
+        .help("Imports simple video, web and static Wallpaper Engine projects")
       }
     }
   }

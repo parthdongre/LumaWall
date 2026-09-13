@@ -62,6 +62,39 @@ final class WallpaperLibrary {
     return wallpaper
   }
 
+  func importWallpaperEngineProject(
+    from source: URL
+  ) async throws -> Wallpaper {
+    let id = UUID()
+    let root = libraryRoot
+
+    let packageRoot = try await Task.detached(priority: .userInitiated) {
+      let importer = WallpaperEngineImporter()
+
+      do {
+        return try importer.importProject(
+          at: source,
+          destinationRoot: root,
+          id: id
+        )
+      } catch {
+        let partial = root.appendingPathComponent(
+          id.uuidString,
+          isDirectory: true
+        )
+        try? FileManager.default.removeItem(at: partial)
+        throw error
+      }
+    }.value
+
+    let wallpaper = try packageService.loadPackage(
+      at: packageRoot,
+      id: id
+    )
+    try persist(wallpaper)
+    return wallpaper
+  }
+
   func importWallpaper(from source: URL) throws -> Wallpaper {
     let id = UUID()
     let wallpaper: Wallpaper

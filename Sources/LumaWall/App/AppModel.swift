@@ -46,6 +46,7 @@ final class AppModel: ObservableObject {
   @Published private(set) var lockScreenSnapshots: [LockScreenSnapshot] = []
   @Published private(set) var lockScreenIsGenerating = false
   @Published var discoverInstallingWallpaperID: UUID?
+  @Published var livePreviewsEnabled = true
 
   let engine = WallpaperEngine()
   let governor = PerformanceGovernor()
@@ -57,11 +58,13 @@ final class AppModel: ObservableObject {
   let quarantine = CrashQuarantineService()
   let lockScreen = LockScreenSnapshotService()
   let discover = DiscoverCatalogService()
+  let livePreview = LivePreviewCoordinator()
   let library: WallpaperLibrary
 
   private var cancellables = Set<AnyCancellable>()
   private var previewGenerationInFlight = Set<UUID>()
   private var lockScreenRefreshTask: Task<Void, Never>?
+  private var telemetryTimer: Timer?
   private let defaults = UserDefaults.standard
 
   private enum Keys {
@@ -92,6 +95,8 @@ final class AppModel: ObservableObject {
     static let lowPowerProfile = "performance.lowPowerProfile"
     static let creatorAuthor = "creator.defaultAuthor"
     static let lockScreenSettings = "lockScreen.companionSettings"
+    static let experimentalLoadAdaptation = "performance.experimentalLoadAdaptation"
+    static let livePreviews = "library.livePreviews"
   }
 
   init() {
@@ -102,6 +107,9 @@ final class AppModel: ObservableObject {
     wallpapers = library.loadAll()
     selectedWallpaperID = wallpapers.first?.id
     creatorDraft.author = defaults.string(forKey: Keys.creatorAuthor) ?? ""
+    livePreviewsEnabled =
+      defaults.object(forKey: Keys.livePreviews) as? Bool
+      ?? true
     lockScreenSettings =
       Self.loadLockScreenSettings(from: defaults)
       ?? .defaultComposition
@@ -223,6 +231,9 @@ final class AppModel: ObservableObject {
       defaults.object(forKey: Keys.pauseGames) as? Bool ?? true
     governor.setAdaptiveQualityEnabled(
       defaults.object(forKey: Keys.adaptiveQuality) as? Bool ?? true)
+    governor.setExperimentalLoadAdaptationEnabled(
+      defaults.object(forKey: Keys.experimentalLoadAdaptation) as? Bool ?? false
+    )
     governor.setMaximumResolutionEnabled(maximumResolutionEnabled)
     governor.setUserTargets(fps: targetFPS, renderScale: renderScale)
     governor.onPolicyChanged = { [weak self] policy in
@@ -232,6 +243,20 @@ final class AppModel: ObservableObject {
       self?.engine.setFullscreenPausedDisplays(displayIDs)
     }
     governor.start()
+
+    let telemetryTimer = Timer(
+      timeInterval: 2,
+      repeats: true
+    ) { [weak self] _ in
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        self.governor.reportRendererDiagnostics(
+          self.engine.rendererSnapshots.map(\.diagnostics)
+        )
+      }
+    }
+    self.telemetryTimer = telemetryTimer
+    RunLoop.main.add(telemetryTimer, forMode: .common)
 
     audio.onFrame = { [weak self] frame in
       Task { @MainActor in self?.engine.updateAudio(frame) }
@@ -269,6 +294,8 @@ final class AppModel: ObservableObject {
     power.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
     discover.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
+      in: &cancellables)
+    livePreview.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
     power.$snapshot
       .dropFirst()
@@ -457,6 +484,8 @@ final class AppModel: ObservableObject {
     Maximum Resolution: \(maximumResolutionEnabled)
     Hardware Recommendation: \(hardwareProfile.explanation)
     Adaptive Quality: \(governor.adaptiveQualityEnabled)
+    Workload Adaptation: \(governor.experimentalLoadAdaptationEnabled)
+    Workload Pressure: \(governor.loadPressure)
     User Paused: \(isPaused)
     Low Power Mode: \(process.isLowPowerModeEnabled)
     Thermal State: \(Self.thermalStateName(process.thermalState))
@@ -575,6 +604,9 @@ final class AppModel: ObservableObject {
   func shutdown() {
     lockScreenRefreshTask?.cancel()
     lockScreenRefreshTask = nil
+    telemetryTimer?.invalidate()
+    telemetryTimer = nil
+    livePreview.stop()
     quarantine.markCleanShutdown()
     engine.stopAll()
     governor.stop()
@@ -606,6 +638,59 @@ final class AppModel: ObservableObject {
 
   func checkForUpdates() {
     updater.checkForUpdates(currentVersion: AppVersion.version)
+  }
+
+  func setExperimentalAdaptiveRenderingEnabled(_ enabled: Bool) {
+    defaults.set(enabled, forKey: Keys.experimentalLoadAdaptation)
+    governor.setExperimentalLoadAdaptationEnabled(enabled)
+  }
+
+  func setLivePreviewsEnabled(_ enabled: Bool) {
+    livePreviewsEnabled = enabled
+    defaults.set(enabled, forKey: Keys.livePreviews)
+
+    if !enabled {
+      livePreview.stop()
+    }
+  }
+
+  func chooseWallpaperEngineProject() {
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = true
+    panel.canChooseFiles = false
+    panel.allowsMultipleSelection = false
+    panel.prompt = "Import Project"
+    panel.message =
+      "Choose a Wallpaper Engine project folder containing project.json."
+
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+
+      do {
+        var wallpaper = try await self.library.importWallpaperEngineProject(
+          from: url
+        )
+
+        if wallpaper.thumbnailURL == nil {
+          wallpaper = await self.library.generatePreviewIfNeeded(for: wallpaper)
+        }
+
+        self.wallpapers.removeAll(where: { $0.id == wallpaper.id })
+        self.wallpapers.append(wallpaper)
+        self.propertyValues[wallpaper.id] = Dictionary(
+          uniqueKeysWithValues: wallpaper.properties.map {
+            ($0.id, $0.defaultValue)
+          }
+        )
+        self.selectedWallpaperID = wallpaper.id
+        self.sidebarSelection = .wallpaper(wallpaper.id)
+        self.statusMessage = "Imported \(wallpaper.name) from Wallpaper Engine"
+      } catch {
+        self.show(error)
+      }
+    }
   }
 
   func chooseCreatorAsset() {
