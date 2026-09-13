@@ -103,3 +103,12 @@ After changing SwiftPM resources from `.process("Resources")` to `.copy("Resourc
 Built-ins are now ordinary `.wall` package directories under `Resources/BuiltInWallpapers`, discovered at runtime from their manifests rather than hardcoded one-by-one in Swift. The first collection adds ten native Metal designs and six HTML/Canvas/WebGL designs alongside Aurora. This makes future additions data-driven: a new bundled wallpaper normally requires only a package directory, manifest, and assets.
 
 Library cards generate missing previews lazily as they become visible. This avoids blocking launch to render every preview while still turning the collection into a visual gallery during normal browsing.
+
+
+## Foreground activation and renderer lifecycle hardening
+
+Wallpaper surfaces now use non-activating `NSPanel` windows instead of ordinary `NSWindow` instances. They remain at the desktop layer and across Spaces, but are excluded from normal window switching so Cmd-Tab/Dock activation can focus the actual LumaWall control window. The app explicitly uses regular activation policy and re-fronts its titled control window when activated or reopened.
+
+Automatic gallery preview generation was removed from every visible card because creating multiple offscreen WebKit/Metal renderers while SwiftUI mutates the gallery can overlap Core Animation transactions. Preview generation remains available as an explicit/single-item path rather than a burst at launch.
+
+Metal teardown now pauses the `MTKView`, detaches its delegate, waits for the latest command buffer to complete, and only then releases the pipeline/device. Web wallpaper teardown stops navigation and detaches delegates/message handlers. Wallpaper panels are ordered out and their content view detached before the panel itself is closed on the next main-run-loop turn. Assignment restoration is delayed briefly after launch, and normal termination stops active renderers first.

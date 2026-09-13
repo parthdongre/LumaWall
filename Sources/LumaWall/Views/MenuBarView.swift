@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MenuBarView: View {
+  @Environment(\.openWindow) private var openWindow
   @EnvironmentObject private var model: AppModel
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -22,8 +23,20 @@ struct MenuBarView: View {
           set: { enabled in model.setSystemAudioEnabled(enabled) }
         ))
       Divider()
-      Button("Open LumaWall") { NSApp.activate(ignoringOtherApps: true) }
-      Button("Quit") { NSApp.terminate(nil) }
+      Button("Open LumaWall") {
+        openWindow(id: "main")
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async {
+          LumaWallAppDelegate.bringControlWindowForward()
+        }
+      }
+      Button("Quit") {
+        model.shutdown()
+        DispatchQueue.main.async {
+          NSApp.terminate(nil)
+        }
+      }
     }.padding(12).frame(width: 250)
   }
 }

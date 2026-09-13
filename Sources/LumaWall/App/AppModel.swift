@@ -49,7 +49,17 @@ final class AppModel: ObservableObject {
       forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
     ) { [weak self] _ in Task { @MainActor in self?.displays = DisplayManager.connectedDisplays() }
     }
-    Task { @MainActor [weak self] in self?.restoreAssignments() }
+    Task { @MainActor [weak self] in
+      try? await Task.sleep(nanoseconds: 500_000_000)
+      self?.restoreAssignments()
+    }
+    NotificationCenter.default.addObserver(
+      forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        self?.shutdown()
+      }
+    }
   }
 
   func ensurePreview(for wallpaperID: UUID) async {
@@ -65,6 +75,13 @@ final class AppModel: ObservableObject {
     let updated = await library.generatePreviewIfNeeded(for: wallpaper)
     if let index = wallpapers.firstIndex(where: { $0.id == wallpaperID }) {
       wallpapers[index] = updated
+    }
+  }
+
+  func shutdown() {
+    engine.stopAll()
+    if systemAudioEnabled {
+      Task { await audio.stop() }
     }
   }
 

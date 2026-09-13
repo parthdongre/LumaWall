@@ -74,8 +74,11 @@ final class WebWallpaperRenderer: NSObject, WallpaperRenderer, WKScriptMessageHa
   }
   func stop() {
     loaded = false
+    paused = true
     webView.stopLoading()
-    webView.loadHTMLString("", baseURL: nil)
+    webView.navigationDelegate = nil
+    webView.configuration.userContentController.removeScriptMessageHandler(forName: "lumawall")
+    messageProxy.delegate = nil
   }
   func setFPS(_ fps: Int) {
     self.fps = fps

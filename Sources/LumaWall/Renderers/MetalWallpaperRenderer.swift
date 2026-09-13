@@ -23,6 +23,7 @@ final class MetalWallpaperRenderer: NSObject, WallpaperRenderer, MTKViewDelegate
   private let device: MTLDevice
   private var commandQueue: MTLCommandQueue
   private var pipeline: MTLRenderPipelineState?
+  private var lastCommandBuffer: MTLCommandBuffer?
   private var startTime = CACurrentMediaTime()
   private var mouse = CGPoint(x: 0.5, y: 0.5)
   private var audio = AudioFrame.zero
@@ -66,7 +67,11 @@ final class MetalWallpaperRenderer: NSObject, WallpaperRenderer, MTKViewDelegate
   func pause() { metalView.isPaused = true }
   func stop() {
     metalView.isPaused = true
+    metalView.delegate = nil
+    lastCommandBuffer?.waitUntilCompleted()
+    lastCommandBuffer = nil
     pipeline = nil
+    metalView.device = nil
   }
   func setFPS(_ fps: Int) { metalView.preferredFramesPerSecond = max(1, fps) }
   func setRenderScale(_ scale: Double) {
@@ -98,6 +103,7 @@ final class MetalWallpaperRenderer: NSObject, WallpaperRenderer, MTKViewDelegate
     encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
     encoder.endEncoding()
     buffer.present(drawable)
+    lastCommandBuffer = buffer
     buffer.commit()
   }
 

@@ -7,7 +7,9 @@ final class WallpaperWindowController {
   let renderer: WallpaperRenderer
   let wallpaperID: UUID
   let grantedPermissions: Set<WallpaperPermission>
-  private let window: NSWindow
+
+  private let window: NSPanel
+  private var isClosed = false
 
   init(
     display: DisplayDescriptor,
@@ -21,9 +23,9 @@ final class WallpaperWindowController {
     self.renderer = renderer
 
     let desktopIconLevel = Int(CGWindowLevelForKey(.desktopIconWindow))
-    let window = NSWindow(
+    let window = NSPanel(
       contentRect: display.screen.frame,
-      styleMask: [.borderless],
+      styleMask: [.borderless, .nonactivatingPanel],
       backing: .buffered,
       defer: false,
       screen: display.screen
@@ -36,16 +38,40 @@ final class WallpaperWindowController {
     window.isOpaque = true
     window.hasShadow = false
     window.backgroundColor = .black
+    window.hidesOnDeactivate = false
+    window.becomesKeyOnlyIfNeeded = true
+    window.isFloatingPanel = false
+    window.isExcludedFromWindowsMenu = true
     window.contentView = renderer.view
     window.setFrame(display.screen.frame, display: true)
     self.window = window
   }
 
-  func show() { window.orderFrontRegardless() }
-  func updateFrame() { window.setFrame(display.screen.frame, display: true) }
+  func show() {
+    guard !isClosed else { return }
+    window.orderFrontRegardless()
+  }
+
+  func updateFrame() {
+    guard !isClosed else { return }
+    window.setFrame(display.screen.frame, display: true)
+  }
+
   func close() {
+    guard !isClosed else { return }
+    isClosed = true
+
+    renderer.pause()
     renderer.stop()
+
     window.orderOut(nil)
-    window.close()
+    window.contentView = nil
+
+    // Give Core Animation one run-loop turn after the renderer has drained before
+    // releasing the window/CAMetalLayer/WebKit backing hierarchy.
+    let retiredWindow = window
+    DispatchQueue.main.async {
+      retiredWindow.close()
+    }
   }
 }
