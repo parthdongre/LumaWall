@@ -5,18 +5,18 @@ import Testing
 @Test @MainActor
 func livePreviewActivatesOnlyOneWallpaper() async throws {
   let coordinator = LivePreviewCoordinator(
-    hoverDelayNanoseconds: 1
+    hoverDelayNanoseconds: 5_000_000
   )
 
   let first = UUID()
   let second = UUID()
 
   coordinator.hover(first)
-  try await Task.sleep(nanoseconds: 1_000_000)
+  try await Task.sleep(nanoseconds: 30_000_000)
   #expect(coordinator.activeWallpaperID == first)
 
   coordinator.hover(second)
-  try await Task.sleep(nanoseconds: 1_000_000)
+  try await Task.sleep(nanoseconds: 30_000_000)
   #expect(coordinator.activeWallpaperID == second)
 
   coordinator.leave(second)
