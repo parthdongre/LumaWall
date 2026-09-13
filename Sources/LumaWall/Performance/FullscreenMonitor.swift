@@ -13,6 +13,9 @@ final class FullscreenMonitor {
   var onChanged: ((ForegroundActivity) -> Void)?
 
   private var timer: Timer?
+  private var workspaceObservers: [NSObjectProtocol] = []
+  private var debouncer = FullscreenPauseDebouncer()
+
   private var last = ForegroundActivity(
     isFullscreen: false,
     fullscreenDisplayIDs: [],
@@ -21,63 +24,89 @@ final class FullscreenMonitor {
   )
 
   func start() {
-    timer?.invalidate()
-    timer = .scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+    stop()
+
+    let timer = Timer(
+      timeInterval: 0.25,
+      repeats: true
+    ) { [weak self] _ in
       Task { @MainActor [weak self] in
         self?.evaluate()
       }
     }
-    evaluate()
+    self.timer = timer
+    RunLoop.main.add(timer, forMode: .common)
+
+    let workspace = NSWorkspace.shared.notificationCenter
+
+    workspaceObservers.append(
+      workspace.addObserver(
+        forName: NSWorkspace.didActivateApplicationNotification,
+        object: nil,
+        queue: .main
+      ) { [weak self] _ in
+        Task { @MainActor [weak self] in
+          self?.evaluate(forceResumeWhenNotFullscreen: true)
+        }
+      }
+    )
+
+    workspaceObservers.append(
+      workspace.addObserver(
+        forName: NSWorkspace.activeSpaceDidChangeNotification,
+        object: nil,
+        queue: .main
+      ) { [weak self] _ in
+        Task { @MainActor [weak self] in
+          self?.evaluate(forceResumeWhenNotFullscreen: true)
+        }
+      }
+    )
+
+    evaluate(forceResumeWhenNotFullscreen: true)
   }
 
   func stop() {
     timer?.invalidate()
     timer = nil
+
+    let workspace = NSWorkspace.shared.notificationCenter
+    for observer in workspaceObservers {
+      workspace.removeObserver(observer)
+    }
+    workspaceObservers.removeAll()
+
+    debouncer.reset()
   }
 
-  private func evaluate() {
+  private func evaluate(
+    forceResumeWhenNotFullscreen: Bool = false
+  ) {
     let front = NSWorkspace.shared.frontmostApplication
     let pid = front?.processIdentifier ?? -1
     let owner = front?.localizedName
-    var fullscreenDisplays = Set<CGDirectDisplayID>()
+    let ownPID = ProcessInfo.processInfo.processIdentifier
 
-    if let windows = CGWindowListCopyWindowInfo(
-      [.optionOnScreenOnly, .excludeDesktopElements],
-      kCGNullWindowID
-    ) as? [[String: Any]] {
-      let displays = DisplayManager.connectedDisplays()
+    let fullscreenDisplays: Set<CGDirectDisplayID>
 
-      for window in windows {
-        guard
-          (window[kCGWindowOwnerPID as String] as? Int32) == pid,
-          (window[kCGWindowLayer as String] as? Int) == 0,
-          let bounds = window[kCGWindowBounds as String] as? [String: Any],
-          let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary),
-          rect.width > 0,
-          rect.height > 0
-        else {
-          continue
-        }
+    if pid == ownPID || pid <= 0 {
+      fullscreenDisplays = []
+    } else {
+      fullscreenDisplays = detectFullscreenDisplays(
+        frontmostPID: pid,
+        ownPID: ownPID
+      )
+    }
 
-        for display in displays {
-          let displayBounds = CGDisplayBounds(display.id)
-          let intersection = rect.intersection(displayBounds)
+    let stableDisplays: Set<CGDirectDisplayID>
 
-          guard !intersection.isNull, !intersection.isEmpty else { continue }
-
-          let displayArea = max(displayBounds.width * displayBounds.height, 1)
-          let coveredArea = intersection.width * intersection.height
-          let coverage = coveredArea / displayArea
-
-          let dimensionsMatch =
-            abs(rect.width - displayBounds.width) <= 4
-            && abs(rect.height - displayBounds.height) <= 4
-
-          if coverage >= 0.97 || dimensionsMatch {
-            fullscreenDisplays.insert(display.id)
-          }
-        }
-      }
+    if forceResumeWhenNotFullscreen && fullscreenDisplays.isEmpty {
+      _ = debouncer.ingest([])
+      stableDisplays = []
+    } else if let committed = debouncer.ingest(fullscreenDisplays) {
+      stableDisplays = committed
+    } else {
+      stableDisplays = debouncer.committed
     }
 
     let category =
@@ -88,8 +117,8 @@ final class FullscreenMonitor {
       } ?? ""
 
     let activity = ForegroundActivity(
-      isFullscreen: !fullscreenDisplays.isEmpty,
-      fullscreenDisplayIDs: fullscreenDisplays,
+      isFullscreen: !stableDisplays.isEmpty,
+      fullscreenDisplayIDs: stableDisplays,
       isGame: category.localizedCaseInsensitiveContains("games"),
       ownerName: owner
     )
@@ -98,5 +127,54 @@ final class FullscreenMonitor {
       last = activity
       onChanged?(activity)
     }
+  }
+
+  private func detectFullscreenDisplays(
+    frontmostPID: Int32,
+    ownPID: Int32
+  ) -> Set<CGDirectDisplayID> {
+    guard let rawWindows = CGWindowListCopyWindowInfo(
+      [.optionOnScreenOnly, .excludeDesktopElements],
+      kCGNullWindowID
+    ) as? [[String: Any]]
+    else {
+      return []
+    }
+
+    let windows = rawWindows.compactMap { window -> ForegroundWindowGeometry? in
+      guard
+        let pidNumber = window[kCGWindowOwnerPID as String] as? NSNumber,
+        let layerNumber = window[kCGWindowLayer as String] as? NSNumber,
+        let bounds = window[kCGWindowBounds as String] as? [String: Any],
+        let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary)
+      else {
+        return nil
+      }
+
+      let alpha =
+        (window[kCGWindowAlpha as String] as? NSNumber)?.doubleValue
+        ?? 1
+
+      return ForegroundWindowGeometry(
+        ownerPID: pidNumber.int32Value,
+        layer: layerNumber.intValue,
+        bounds: rect,
+        alpha: alpha
+      )
+    }
+
+    let displays = DisplayManager.connectedDisplays().map {
+      FullscreenDisplayGeometry(
+        id: $0.id,
+        bounds: CGDisplayBounds($0.id)
+      )
+    }
+
+    return FullscreenDetection.matchingDisplayIDs(
+      windows: windows,
+      frontmostPID: frontmostPID,
+      ownPID: ownPID,
+      displays: displays
+    )
   }
 }

@@ -19,7 +19,28 @@ final class WallpaperWindowController {
   private let timeDateOverlay = TimeDateOverlayView()
 
   private var isClosed = false
-  private var fullscreenSuppressed = false
+  private(set) var fullscreenSuppressed = false
+
+  static var wallpaperWindowLevel: NSWindow.Level {
+    let desktopLevel = Int(CGWindowLevelForKey(.desktopWindow))
+    let iconLevel = Int(CGWindowLevelForKey(.desktopIconWindow))
+
+    // The safest desktop surface is immediately below Finder's icon level.
+    // Window levels are absolute: ordering this window to the front at this
+    // level can never put it above normal application windows or Finder icons.
+    let raw =
+      iconLevel > desktopLevel
+      ? iconLevel - 1
+      : desktopLevel + 1
+
+    return NSWindow.Level(rawValue: raw)
+  }
+
+  static let wallpaperCollectionBehavior: NSWindow.CollectionBehavior = [
+    .canJoinAllSpaces,
+    .stationary,
+    .ignoresCycle,
+  ]
 
   init(
     display: DisplayDescriptor,
@@ -32,10 +53,6 @@ final class WallpaperWindowController {
     self.grantedPermissions = grantedPermissions
     self.renderer = renderer
 
-    let desktopLevel = Int(CGWindowLevelForKey(.desktopWindow))
-    let iconLevel = Int(CGWindowLevelForKey(.desktopIconWindow))
-    let wallpaperLevel = min(desktopLevel + 1, iconLevel - 1)
-
     let window = WallpaperPanel(
       contentRect: display.screen.frame,
       styleMask: [.borderless, .nonactivatingPanel],
@@ -44,12 +61,8 @@ final class WallpaperWindowController {
       screen: display.screen
     )
 
-    window.level = NSWindow.Level(rawValue: wallpaperLevel)
-    window.collectionBehavior = [
-      .canJoinAllSpaces,
-      .stationary,
-      .ignoresCycle,
-    ]
+    window.level = Self.wallpaperWindowLevel
+    window.collectionBehavior = Self.wallpaperCollectionBehavior
     window.ignoresMouseEvents = true
     window.isOpaque = true
     window.hasShadow = false
@@ -93,13 +106,18 @@ final class WallpaperWindowController {
   }
 
   func show(alpha: CGFloat = 1) {
-    guard !isClosed, !fullscreenSuppressed else { return }
+    guard !isClosed else { return }
+
     window.alphaValue = alpha
-    window.orderBack(nil)
+
+    // Keep the wallpaper at a deterministic desktop level. We deliberately do
+    // not use orderBack: Finder may then place its static desktop surface above
+    // us after app/Space changes, producing an apparent wallpaper off/on flash.
+    window.orderFrontRegardless()
   }
 
   func orderAbove(_ other: WallpaperWindowController) {
-    guard !isClosed, !fullscreenSuppressed else { return }
+    guard !isClosed else { return }
     window.order(.above, relativeTo: other.windowNumber)
   }
 
@@ -112,11 +130,7 @@ final class WallpaperWindowController {
       return
     }
 
-    guard
-      !fullscreenSuppressed,
-      settings.style != .instant,
-      settings.duration > 0
-    else {
+    guard settings.style != .instant, settings.duration > 0 else {
       window.alphaValue = 1
       completion()
       return
@@ -174,17 +188,14 @@ final class WallpaperWindowController {
   }
 
   func setFullscreenSuppressed(_ suppressed: Bool) {
-    guard !isClosed, fullscreenSuppressed != suppressed else { return }
+    guard !isClosed else { return }
 
+    // Fullscreen suppression is a renderer-performance state, not a window
+    // visibility state. The panel already lives below app windows and is not
+    // allowed into fullscreen Spaces. Ordering it out/in caused the desktop to
+    // flash back to the static macOS wallpaper during false positives and app
+    // switches.
     fullscreenSuppressed = suppressed
-
-    if suppressed {
-      window.orderOut(nil)
-    } else {
-      window.setFrame(display.screen.frame, display: true)
-      window.alphaValue = 1
-      window.orderBack(nil)
-    }
   }
 
   func updateDisplay(_ updatedDisplay: DisplayDescriptor) {
@@ -193,10 +204,7 @@ final class WallpaperWindowController {
     display = updatedDisplay
     renderer.configure(for: updatedDisplay)
     window.setFrame(updatedDisplay.screen.frame, display: true)
-
-    if !fullscreenSuppressed {
-      window.orderBack(nil)
-    }
+    window.orderFrontRegardless()
   }
 
   func updateFrame() {
@@ -204,10 +212,7 @@ final class WallpaperWindowController {
 
     renderer.configure(for: display)
     window.setFrame(display.screen.frame, display: true)
-
-    if !fullscreenSuppressed {
-      window.orderBack(nil)
-    }
+    window.orderFrontRegardless()
   }
 
   func close() {

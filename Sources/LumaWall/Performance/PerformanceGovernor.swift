@@ -43,11 +43,18 @@ final class PerformanceGovernor: ObservableObject {
     monitor.start()
 
     timer?.invalidate()
-    timer = .scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+
+    let policyTimer = Timer(
+      timeInterval: 2,
+      repeats: true
+    ) { [weak self] _ in
       Task { @MainActor [weak self] in
         self?.evaluate()
       }
     }
+
+    timer = policyTimer
+    RunLoop.main.add(policyTimer, forMode: .common)
 
     evaluateFullscreenPauses()
     evaluate()
