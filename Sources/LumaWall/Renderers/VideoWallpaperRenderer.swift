@@ -31,6 +31,10 @@ final class VideoWallpaperRenderer: WallpaperRenderer {
     playerView.playerLayer.player = queue
   }
 
+  func configure(for display: DisplayDescriptor) {
+    playerView.layer?.contentsScale = display.backingScaleFactor
+  }
+
   func play() { player?.play() }
   func pause() { player?.pause() }
 

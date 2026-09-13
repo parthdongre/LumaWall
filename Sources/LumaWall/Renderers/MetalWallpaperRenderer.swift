@@ -29,6 +29,8 @@ final class MetalWallpaperRenderer: NSObject, WallpaperRenderer, MTKViewDelegate
   private var audio = AudioFrame.zero
   private var propertyDefinitions: [WallpaperProperty] = []
   private var propertyValues: [String: WallpaperPropertyValue] = [:]
+  private var targetNativePixelSize = CGSize(width: 1920, height: 1080)
+  private var renderScale = 1.0
   var view: NSView { metalView }
 
   override init() {
@@ -44,6 +46,7 @@ final class MetalWallpaperRenderer: NSObject, WallpaperRenderer, MTKViewDelegate
     metalView.enableSetNeedsDisplay = false
     metalView.isPaused = false
     metalView.framebufferOnly = false
+    metalView.autoResizeDrawable = false
   }
 
   func load(_ wallpaper: Wallpaper) throws {
@@ -73,11 +76,18 @@ final class MetalWallpaperRenderer: NSObject, WallpaperRenderer, MTKViewDelegate
     pipeline = nil
     metalView.device = nil
   }
-  func setFPS(_ fps: Int) { metalView.preferredFramesPerSecond = max(1, fps) }
+  func configure(for display: DisplayDescriptor) {
+    targetNativePixelSize = display.nativePixelSize
+    updateDrawableSize()
+  }
+
+  func setFPS(_ fps: Int) {
+    metalView.preferredFramesPerSecond = max(1, fps)
+  }
+
   func setRenderScale(_ scale: Double) {
-    let b = max(0.25, min(1, scale))
-    let s = metalView.bounds.size
-    metalView.drawableSize = CGSize(width: s.width * b, height: s.height * b)
+    renderScale = max(0.25, min(1, scale))
+    updateDrawableSize()
   }
   func updateInteraction(_ state: InteractionState) { mouse = state.normalizedMouse }
   func updateAudio(_ frame: AudioFrame) { audio = frame }
@@ -85,6 +95,13 @@ final class MetalWallpaperRenderer: NSObject, WallpaperRenderer, MTKViewDelegate
     propertyValues.merge(properties) { _, new in new }
   }
   func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+
+  private func updateDrawableSize() {
+    metalView.drawableSize = CGSize(
+      width: max(1, targetNativePixelSize.width * renderScale),
+      height: max(1, targetNativePixelSize.height * renderScale)
+    )
+  }
 
   func draw(in view: MTKView) {
     guard let pipeline, let descriptor = view.currentRenderPassDescriptor,

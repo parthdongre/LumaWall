@@ -36,6 +36,8 @@ func bundledWallpaperCollectionIsDiscoverable() {
 
 @Test
 func qualityPresetsHaveStableTargets() {
+  #expect(RenderQualityPreset.automatic.targetFPS == nil)
+  #expect(RenderQualityPreset.automatic.renderScale == nil)
   #expect(RenderQualityPreset.eco.targetFPS == 30)
   #expect(RenderQualityPreset.eco.renderScale == 0.65)
   #expect(RenderQualityPreset.balanced.targetFPS == 60)
@@ -52,4 +54,15 @@ func libraryScopesHaveStableIdentifiers() {
   #expect(LibraryScope.favorites.rawValue == "favorites")
   #expect(LibraryScope.recent.rawValue == "recent")
   #expect(Set(LibraryScope.allCases.map(\.rawValue)).count == LibraryScope.allCases.count)
+}
+
+
+@Test @MainActor
+func detectedDisplaysExposePixelTargets() {
+  for display in DisplayManager.connectedDisplays() {
+    #expect(display.nativePixelSize.width > 0)
+    #expect(display.nativePixelSize.height > 0)
+    #expect(display.backingScaleFactor >= 1)
+    #expect(display.maximumFPS >= 1)
+  }
 }

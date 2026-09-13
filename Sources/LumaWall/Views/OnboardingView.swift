@@ -110,34 +110,58 @@ struct OnboardingView: View {
   }
 
   private var performance: some View {
-    VStack(alignment: .leading, spacing: 24) {
-      Text("Choose your default quality")
+    VStack(alignment: .leading, spacing: 18) {
+      Text("Optimized for this Mac")
         .font(.largeTitle.bold())
 
-      Text(
-        "LumaWall can automatically lower rendering cost when your Mac is on Low Power Mode or under thermal pressure."
-      )
-      .foregroundStyle(.secondary)
-
       HStack(spacing: 14) {
-        presetCard(.eco, subtitle: "30 FPS • 65% scale")
-        presetCard(.balanced, subtitle: "60 FPS • 85% scale")
-        presetCard(.ultra, subtitle: "120 FPS • 100% scale")
+        Image(systemName: model.hardwareProfile.isPortable ? "laptopcomputer" : "desktopcomputer")
+          .font(.system(size: 30))
+          .frame(width: 42)
+
+        VStack(alignment: .leading, spacing: 3) {
+          Text(model.hardwareProfile.deviceFamily)
+            .font(.headline)
+          Text(model.hardwareProfile.chipName)
+            .foregroundStyle(.secondary)
+          Text(
+            "\(model.hardwareProfile.modelIdentifier) • \(model.hardwareProfile.memoryGB) GB memory"
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        }
+      }
+
+      Text(model.hardwareProfile.explanation)
+        .font(.callout)
+        .foregroundStyle(.secondary)
+
+      LazyVGrid(
+        columns: [GridItem(.flexible()), GridItem(.flexible())],
+        spacing: 12
+      ) {
+        presetCard(
+          .automatic,
+          subtitle: "\(model.hardwareProfile.recommendedFPS) FPS • native pixels"
+        )
+        presetCard(.eco, subtitle: "30 FPS • battery focused")
+        presetCard(.balanced, subtitle: "60 FPS • balanced")
+        presetCard(.ultra, subtitle: "120 FPS • maximum motion")
       }
 
       Toggle(
-        "Automatically reduce quality for battery and thermal conditions",
+        "Maximum Resolution — always render at native display pixels",
         isOn: Binding(
-          get: { model.governor.adaptiveQualityEnabled },
-          set: { model.setAdaptiveQualityEnabled($0) }
+          get: { model.maximumResolutionEnabled },
+          set: { model.setMaximumResolutionEnabled($0) }
         )
       )
 
       Toggle(
-        "Pause wallpapers when another app is fullscreen",
+        "Automatically reduce FPS for battery and thermal conditions",
         isOn: Binding(
-          get: { model.governor.pauseForFullscreen },
-          set: { model.setPauseForFullscreen($0) }
+          get: { model.governor.adaptiveQualityEnabled },
+          set: { model.setAdaptiveQualityEnabled($0) }
         )
       )
 

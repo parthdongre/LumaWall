@@ -110,6 +110,14 @@ struct WallpaperDetailView: View {
               .frame(width: 250)
             }
 
+            Toggle(
+              "Maximum Resolution",
+              isOn: Binding(
+                get: { model.maximumResolutionEnabled },
+                set: { model.setMaximumResolutionEnabled($0) }
+              )
+            )
+
             VStack(alignment: .leading, spacing: 6) {
               HStack {
                 Text("Render scale")
@@ -125,6 +133,18 @@ struct WallpaperDetailView: View {
                 in: 0.25...1,
                 step: 0.05
               )
+              .disabled(model.maximumResolutionEnabled)
+
+              if model.maximumResolutionEnabled {
+                Text(
+                  "Native pixels: "
+                    + model.displays
+                      .map { "\($0.name) \($0.nativeResolutionLabel)" }
+                      .joined(separator: " • ")
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              }
             }
           }
         }

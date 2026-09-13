@@ -57,6 +57,21 @@ struct DiagnosticsView: View {
           )
         }
 
+        GroupBox("Detected hardware") {
+          VStack(alignment: .leading, spacing: 8) {
+            diagnosticRow("Device", model.hardwareProfile.deviceFamily)
+            diagnosticRow("Model identifier", model.hardwareProfile.modelIdentifier)
+            diagnosticRow("Graphics / chip", model.hardwareProfile.chipName)
+            diagnosticRow("Memory", "\(model.hardwareProfile.memoryGB) GB")
+            diagnosticRow("CPU cores", "\(model.hardwareProfile.processorCount)")
+            diagnosticRow(
+              "Maximum Resolution",
+              model.maximumResolutionEnabled ? "Locked to native pixels" : "Dynamic / manual"
+            )
+            diagnosticRow("Hardware recommendation", model.hardwareProfile.explanation)
+          }
+        }
+
         GroupBox("Display assignments") {
           VStack(alignment: .leading, spacing: 10) {
             ForEach(model.displays) { display in
@@ -67,6 +82,11 @@ struct DiagnosticsView: View {
                   Text(model.assignmentName(for: display))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                  Text(
+                    "\(display.nativeResolutionLabel) • \(display.refreshLabel) • \(String(format: "%.1f×", display.backingScaleFactor))"
+                  )
+                  .font(.caption2)
+                  .foregroundStyle(.tertiary)
                 }
                 Spacer()
               }

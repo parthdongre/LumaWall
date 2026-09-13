@@ -25,6 +25,7 @@ final class WebWallpaperRenderer: NSObject, WallpaperRenderer, WKScriptMessageHa
   private var interaction = InteractionState(normalizedMouse: CGPoint(x: 0.5, y: 0.5))
   private var audio = AudioFrame.zero
   private var properties: [String: WallpaperPropertyValue] = [:]
+  private var displayInfo: [String: Any] = [:]
 
   var view: NSView { webView }
 
@@ -38,6 +39,16 @@ final class WebWallpaperRenderer: NSObject, WallpaperRenderer, WKScriptMessageHa
     super.init()
     proxy.delegate = self
     webView.navigationDelegate = self
+  }
+
+  func configure(for display: DisplayDescriptor) {
+    webView.layer?.contentsScale = display.backingScaleFactor
+    displayInfo = [
+      "pixelWidth": Int(display.nativePixelSize.width),
+      "pixelHeight": Int(display.nativePixelSize.height),
+      "scaleFactor": display.backingScaleFactor,
+      "maximumFPS": display.maximumFPS,
+    ]
   }
 
   func load(_ wallpaper: Wallpaper) throws {
@@ -139,6 +150,7 @@ final class WebWallpaperRenderer: NSObject, WallpaperRenderer, WKScriptMessageHa
   }
 
   private func flushState() {
+    send("display", payload: displayInfo)
     send("fps", payload: fps)
     send("scale", payload: renderScale)
     send(

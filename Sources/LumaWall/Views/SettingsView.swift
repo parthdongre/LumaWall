@@ -83,6 +83,93 @@ struct SettingsView: View {
 
   private var performance: some View {
     Form {
+      Section("This Mac") {
+        HStack(spacing: 14) {
+          Image(systemName: model.hardwareProfile.isPortable ? "laptopcomputer" : "desktopcomputer")
+            .font(.system(size: 32))
+            .frame(width: 44)
+
+          VStack(alignment: .leading, spacing: 3) {
+            Text(model.hardwareProfile.deviceFamily)
+              .font(.headline)
+            Text(model.hardwareProfile.chipName)
+              .foregroundStyle(.secondary)
+            Text(
+              "\(model.hardwareProfile.modelIdentifier) • \(model.hardwareProfile.memoryGB) GB • \(model.hardwareProfile.processorCount) CPU cores"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          }
+
+          Spacer()
+
+          Button("Optimize") {
+            model.applyHardwareRecommendation()
+          }
+        }
+
+        Text(model.hardwareProfile.explanation)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
+      Section("Resolution") {
+        Toggle(
+          "Maximum Resolution",
+          isOn: Binding(
+            get: { model.maximumResolutionEnabled },
+            set: { model.setMaximumResolutionEnabled($0) }
+          )
+        )
+
+        Text(
+          model.maximumResolutionEnabled
+            ? "Wallpapers render at each display's native backing-pixel resolution. Battery/thermal adaptation lowers FPS before resolution."
+            : "Dynamic/manual render scaling is allowed to reduce GPU work."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+
+        VStack(alignment: .leading, spacing: 6) {
+          HStack {
+            Text("Render scale")
+            Spacer()
+            Text("\(Int(model.renderScale * 100))%")
+              .foregroundStyle(.secondary)
+          }
+
+          Slider(
+            value: Binding(
+              get: { model.renderScale },
+              set: { model.updateRenderScale($0) }
+            ),
+            in: 0.25...1,
+            step: 0.05
+          )
+          .disabled(model.maximumResolutionEnabled)
+        }
+
+        ForEach(model.displays) { display in
+          HStack {
+            Text(display.name)
+            Spacer()
+            Text(
+              model.maximumResolutionEnabled
+                ? display.nativeResolutionLabel
+                : "\(Int(display.nativePixelSize.width * model.renderScale)) × \(Int(display.nativePixelSize.height * model.renderScale))"
+            )
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+          }
+        }
+
+        Text(
+          "Native resolution sets the render target. Image and video sharpness is still limited by the source file's own pixel resolution."
+        )
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+      }
+
       Section("Quality") {
         Picker(
           "Quality preset",
@@ -116,21 +203,13 @@ struct SettingsView: View {
           .frame(width: 220)
         }
 
-        VStack(alignment: .leading, spacing: 6) {
-          HStack {
-            Text("Preferred render scale")
-            Spacer()
-            Text("\(Int(model.renderScale * 100))%")
-              .foregroundStyle(.secondary)
-          }
-          Slider(
-            value: Binding(
-              get: { model.renderScale },
-              set: { model.updateRenderScale($0) }
-            ),
-            in: 0.25...1,
-            step: 0.05
+        if model.qualityPreset == .automatic {
+          Label(
+            "Automatic is currently targeting \(model.targetFPS) FPS at native resolution.",
+            systemImage: "sparkles"
           )
+          .font(.caption)
+          .foregroundStyle(.secondary)
         }
       }
 
@@ -160,7 +239,7 @@ struct SettingsView: View {
         )
 
         Text(
-          "Critical thermal conditions can always pause rendering to protect system responsiveness."
+          "With Maximum Resolution enabled, adaptive mode preserves native pixels and reduces frame rate first. Critical thermal conditions can still pause rendering."
         )
         .font(.caption)
         .foregroundStyle(.secondary)

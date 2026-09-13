@@ -22,6 +22,7 @@ final class PerformanceGovernor: ObservableObject {
   @Published private(set) var adaptiveQualityEnabled = true
   @Published private(set) var preferredFPS = 60
   @Published private(set) var preferredRenderScale = 1.0
+  @Published private(set) var maximumResolutionEnabled = true
 
   private var timer: Timer?
   private var lastPolicy: PerformancePolicy?
@@ -59,6 +60,11 @@ final class PerformanceGovernor: ObservableObject {
     evaluate()
   }
 
+  func setMaximumResolutionEnabled(_ enabled: Bool) {
+    maximumResolutionEnabled = enabled
+    evaluate()
+  }
+
   func refresh() {
     evaluate()
   }
@@ -77,19 +83,19 @@ final class PerformanceGovernor: ObservableObject {
     {
       policy = .init(
         targetFPS: min(preferredFPS, 24),
-        renderScale: min(preferredRenderScale, 0.6),
+        renderScale: maximumResolutionEnabled ? 1.0 : min(preferredRenderScale, 0.6),
         shouldPause: false
       )
     } else if adaptiveQualityEnabled && process.thermalState == .fair {
       policy = .init(
         targetFPS: min(preferredFPS, 30),
-        renderScale: min(preferredRenderScale, 0.75),
+        renderScale: maximumResolutionEnabled ? 1.0 : min(preferredRenderScale, 0.75),
         shouldPause: false
       )
     } else {
       policy = .init(
         targetFPS: preferredFPS,
-        renderScale: preferredRenderScale,
+        renderScale: maximumResolutionEnabled ? 1.0 : preferredRenderScale,
         shouldPause: false
       )
     }

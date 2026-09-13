@@ -11,6 +11,10 @@ final class ImageWallpaperRenderer: WallpaperRenderer {
     imageView.layer?.backgroundColor = NSColor.black.cgColor
   }
 
+  func configure(for display: DisplayDescriptor) {
+    imageView.layer?.contentsScale = display.backingScaleFactor
+  }
+
   func load(_ wallpaper: Wallpaper) throws {
     guard let image = NSImage(contentsOf: wallpaper.entryURL) else {
       throw WallpaperError.unreadableAsset(wallpaper.entryURL)

@@ -45,7 +45,7 @@ jobs:
       - name: Package installable macOS artifacts
         if: github.event_name == 'push'
         env:
-          VERSION: 0.3.1
+          VERSION: 0.3.2
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           chmod +x scripts/package-macos.sh
@@ -71,9 +71,9 @@ jobs:
           name: LumaWall-macOS-${{ github.sha }}
           path: |
             dist/LumaWall.app
-            dist/LumaWall-0.3.1-macOS.zip
-            dist/LumaWall-0.3.1.dmg
-            dist/LumaWall-0.3.1.pkg
+            dist/LumaWall-0.3.2-macOS.zip
+            dist/LumaWall-0.3.2.dmg
+            dist/LumaWall-0.3.2.pkg
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14

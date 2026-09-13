@@ -58,6 +58,7 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 }
 
 enum RenderQualityPreset: String, CaseIterable, Identifiable {
+  case automatic
   case eco
   case balanced
   case ultra
@@ -67,6 +68,7 @@ enum RenderQualityPreset: String, CaseIterable, Identifiable {
 
   var displayName: String {
     switch self {
+    case .automatic: return "Automatic"
     case .eco: return "Eco"
     case .balanced: return "Balanced"
     case .ultra: return "Ultra"
@@ -76,6 +78,7 @@ enum RenderQualityPreset: String, CaseIterable, Identifiable {
 
   var targetFPS: Int? {
     switch self {
+    case .automatic: return nil
     case .eco: return 30
     case .balanced: return 60
     case .ultra: return 120
@@ -85,6 +88,7 @@ enum RenderQualityPreset: String, CaseIterable, Identifiable {
 
   var renderScale: Double? {
     switch self {
+    case .automatic: return nil
     case .eco: return 0.65
     case .balanced: return 0.85
     case .ultra: return 1.0

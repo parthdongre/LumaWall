@@ -15,8 +15,11 @@ After installation, everything is controlled from the app:
 - search and filtering
 - playlists and schedules
 - creator sliders, colors, toggles and dropdowns
+- Mac hardware detection and automatic tuning
+- native Retina/max-resolution rendering per display
 - 30 / 60 / 120 FPS controls
-- quality presets and render scale
+- Automatic / Eco / Balanced / Ultra quality presets
+- Maximum Resolution lock plus manual render scale
 - adaptive battery / thermal performance
 - fullscreen and game auto-pause
 - mouse interaction

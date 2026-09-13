@@ -13,7 +13,7 @@ make package
 or:
 
 ```bash
-VERSION=0.3.0 ./scripts/package-macos.sh
+VERSION=0.3.2 ./scripts/package-macos.sh
 ```
 
 The build writes:
@@ -21,9 +21,9 @@ The build writes:
 ```text
 dist/
 ├── LumaWall.app
-├── LumaWall-0.3.0-macOS.zip
-├── LumaWall-0.3.0.dmg
-├── LumaWall-0.3.0.pkg
+├── LumaWall-0.3.2-macOS.zip
+├── LumaWall-0.3.2.dmg
+├── LumaWall-0.3.2.pkg
 └── SHA256SUMS.txt
 ```
 
@@ -47,7 +47,7 @@ If a Developer ID Application identity is already installed in the current keych
 
 ```bash
 SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-VERSION=0.3.0 \
+VERSION=0.3.2 \
 ./scripts/package-macos.sh
 ```
 
@@ -73,7 +73,7 @@ The current repository intentionally does not hard-code developer credentials. W
 `.github/workflows/release.yml` supports:
 
 - versioned manual package builds via **Run workflow**;
-- automatic GitHub Releases for tags such as `v0.3.0`.
+- automatic GitHub Releases for tags such as `v0.3.2`.
 
 A tag release publishes the ZIP, DMG, PKG, and SHA-256 checksum file.
 

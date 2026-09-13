@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.2 - Native-resolution hardware-aware rendering
+
+### Hardware detection
+- Detects the current Mac model identifier, Apple GPU/chip name, installed memory and CPU core count.
+- Detects whether the machine has a built-in display and presents it as a MacBook-class portable when appropriate.
+- Chooses an Automatic FPS target from the Mac and connected display capabilities.
+- Re-runs display capability detection when macOS display parameters change.
+
+### Maximum resolution
+- Display descriptors now track native backing-pixel dimensions, logical point dimensions, Retina backing scale and refresh capability.
+- Metal wallpaper drawables target the display's native framebuffer pixels instead of SwiftUI/AppKit logical points.
+- Maximum Resolution is enabled by default and keeps native pixel density even when adaptive battery/thermal mode lowers FPS.
+- Users can disable Maximum Resolution and choose a manual render scale when battery/GPU savings matter more than sharpness.
+- External display or scaling changes update active renderers without restarting LumaWall.
+
+### UI
+- Displays screen shows detected Mac hardware plus each monitor's native resolution, scale factor and refresh capability.
+- Performance Settings includes Optimize for This Mac and Maximum Resolution controls.
+- Onboarding defaults to hardware-aware Automatic quality.
+- Diagnostics include model, chip/GPU, memory and native render targets.
+
 ## 0.3.1 - App-only macOS UX
 
 ### Native user flow

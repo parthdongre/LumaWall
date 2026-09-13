@@ -10,8 +10,10 @@ final class AppModel: ObservableObject {
   @Published var selectedTargetDisplayID: CGDirectDisplayID?
   @Published var isPaused = false
   @Published var targetFPS = 60
-  @Published var renderScale = 0.85
+  @Published var renderScale = 1.0
+  @Published var maximumResolutionEnabled = true
   @Published var displays: [DisplayDescriptor] = []
+  @Published private(set) var hardwareProfile: MacHardwareProfile
   @Published var propertyValues: [UUID: [String: WallpaperPropertyValue]] = [:]
   @Published var systemAudioEnabled = false
   @Published var lastError: String?
@@ -20,7 +22,7 @@ final class AppModel: ObservableObject {
   @Published var librarySortOrder: LibrarySortOrder = .name
   @Published private(set) var favoriteWallpaperIDs: Set<UUID> = []
   @Published private(set) var recentWallpaperIDs: [UUID] = []
-  @Published var qualityPreset: RenderQualityPreset = .balanced
+  @Published var qualityPreset: RenderQualityPreset = .automatic
   @Published var restoreAssignmentsOnLaunch = true
   @Published private(set) var isSafeMode = false
   @Published var statusMessage: String?
@@ -47,6 +49,8 @@ final class AppModel: ObservableObject {
     static let qualityPreset = "performance.qualityPreset"
     static let targetFPS = "performance.targetFPS"
     static let renderScale = "performance.renderScale"
+    static let maximumResolution = "performance.maximumResolution"
+    static let hardwareProfileApplied = "performance.hardwareProfileApplied"
     static let adaptiveQuality = "performance.adaptiveQuality"
     static let pauseFullscreen = "performance.pauseFullscreen"
     static let pauseGames = "performance.pauseGames"
@@ -57,8 +61,10 @@ final class AppModel: ObservableObject {
 
   init() {
     library = WallpaperLibrary()
+    let detectedDisplays = DisplayManager.connectedDisplays()
+    hardwareProfile = MacHardwareProfile.detect(displays: detectedDisplays)
+    displays = detectedDisplays
     wallpapers = library.loadAll()
-    displays = DisplayManager.connectedDisplays()
     selectedWallpaperID = wallpapers.first?.id
     showOnboarding = !defaults.bool(forKey: Keys.onboardingCompleted)
 
@@ -68,14 +74,33 @@ final class AppModel: ObservableObject {
       defaults.stringArray(forKey: Keys.recents)?.compactMap(UUID.init(uuidString:)) ?? []
     librarySortOrder =
       defaults.string(forKey: Keys.sort).flatMap(LibrarySortOrder.init(rawValue:)) ?? .name
-    qualityPreset =
-      defaults.string(forKey: Keys.qualityPreset).flatMap(RenderQualityPreset.init(rawValue:))
-      ?? .balanced
+    let hardwareProfileAlreadyApplied = defaults.bool(forKey: Keys.hardwareProfileApplied)
+    if hardwareProfileAlreadyApplied {
+      qualityPreset =
+        defaults.string(forKey: Keys.qualityPreset).flatMap(RenderQualityPreset.init(rawValue:))
+        ?? .automatic
 
-    let savedFPS = defaults.integer(forKey: Keys.targetFPS)
-    targetFPS = savedFPS > 0 ? savedFPS : (qualityPreset.targetFPS ?? 60)
-    let savedScale = defaults.object(forKey: Keys.renderScale) as? Double
-    renderScale = savedScale ?? qualityPreset.renderScale ?? 0.85
+      let savedFPS = defaults.integer(forKey: Keys.targetFPS)
+      targetFPS = savedFPS > 0 ? savedFPS : hardwareProfile.recommendedFPS
+      maximumResolutionEnabled =
+        defaults.object(forKey: Keys.maximumResolution) as? Bool ?? true
+
+      let savedScale = defaults.object(forKey: Keys.renderScale) as? Double
+      renderScale =
+        maximumResolutionEnabled
+        ? 1.0
+        : (savedScale ?? qualityPreset.renderScale ?? hardwareProfile.recommendedRenderScale)
+    } else {
+      qualityPreset = .automatic
+      targetFPS = hardwareProfile.recommendedFPS
+      renderScale = hardwareProfile.recommendedRenderScale
+      maximumResolutionEnabled = true
+      defaults.set(RenderQualityPreset.automatic.rawValue, forKey: Keys.qualityPreset)
+      defaults.set(targetFPS, forKey: Keys.targetFPS)
+      defaults.set(renderScale, forKey: Keys.renderScale)
+      defaults.set(true, forKey: Keys.maximumResolution)
+      defaults.set(true, forKey: Keys.hardwareProfileApplied)
+    }
 
     restoreAssignmentsOnLaunch =
       defaults.object(forKey: Keys.restoreAssignments) as? Bool ?? true
@@ -101,6 +126,7 @@ final class AppModel: ObservableObject {
       defaults.object(forKey: Keys.pauseGames) as? Bool ?? true
     governor.setAdaptiveQualityEnabled(
       defaults.object(forKey: Keys.adaptiveQuality) as? Bool ?? true)
+    governor.setMaximumResolutionEnabled(maximumResolutionEnabled)
     governor.setUserTargets(fps: targetFPS, renderScale: renderScale)
     governor.onPolicyChanged = { [weak self] policy in
       self?.engine.apply(policy: policy)
@@ -129,7 +155,14 @@ final class AppModel: ObservableObject {
       queue: .main
     ) { [weak self] _ in
       Task { @MainActor in
-        self?.displays = DisplayManager.connectedDisplays()
+        guard let self else { return }
+        let updatedDisplays = DisplayManager.connectedDisplays()
+        self.displays = updatedDisplays
+        self.engine.refreshDisplays(updatedDisplays)
+        self.hardwareProfile = MacHardwareProfile.detect(displays: updatedDisplays)
+        if self.qualityPreset == .automatic {
+          self.applyHardwareRecommendation()
+        }
       }
     }
 
@@ -153,6 +186,13 @@ final class AppModel: ObservableObject {
     ) { [weak self] _ in
       Task { @MainActor in
         self?.shutdown()
+      }
+    }
+
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      if let marketingName = await MacHardwareProfile.resolveMarketingName() {
+        self.hardwareProfile = self.hardwareProfile.replacingMarketingName(marketingName)
       }
     }
 
@@ -187,7 +227,7 @@ final class AppModel: ObservableObject {
     let process = ProcessInfo.processInfo
     let assignments = displays.map { display in
       let wallpaper = assignmentName(for: display)
-      return "  • \(display.name) [\(display.id)]: \(wallpaper)"
+      return "  • \(display.name) [\(display.id)]: \(wallpaper) — \(display.nativeResolutionLabel), \(display.refreshLabel), \(String(format: "%.1f×", display.backingScaleFactor))"
     }.joined(separator: "\n")
 
     return """
@@ -196,6 +236,11 @@ final class AppModel: ObservableObject {
     Version: \(AppVersion.display)
     macOS: \(process.operatingSystemVersionString)
     Architecture: \(Self.architectureName)
+    Device: \(hardwareProfile.deviceFamily)
+    Model Identifier: \(hardwareProfile.modelIdentifier)
+    Graphics / Chip: \(hardwareProfile.chipName)
+    Memory: \(hardwareProfile.memoryGB) GB
+    CPU Cores: \(hardwareProfile.processorCount)
     Safe Mode: \(isSafeMode)
     Restore on Launch: \(restoreAssignmentsOnLaunch)
 
@@ -204,6 +249,8 @@ final class AppModel: ObservableObject {
     Quality Preset: \(qualityPreset.displayName)
     Preferred FPS: \(targetFPS)
     Preferred Render Scale: \(Int(renderScale * 100))%
+    Maximum Resolution: \(maximumResolutionEnabled)
+    Hardware Recommendation: \(hardwareProfile.explanation)
     Adaptive Quality: \(governor.adaptiveQualityEnabled)
     User Paused: \(isPaused)
     Low Power Mode: \(process.isLowPowerModeEnabled)
@@ -448,12 +495,29 @@ final class AppModel: ObservableObject {
   func applyQualityPreset(_ preset: RenderQualityPreset) {
     qualityPreset = preset
     defaults.set(preset.rawValue, forKey: Keys.qualityPreset)
+
+    if preset == .automatic {
+      applyHardwareRecommendation()
+      return
+    }
+
     guard let fps = preset.targetFPS, let scale = preset.renderScale else { return }
     targetFPS = fps
-    renderScale = scale
-    defaults.set(fps, forKey: Keys.targetFPS)
-    defaults.set(scale, forKey: Keys.renderScale)
-    governor.setUserTargets(fps: fps, renderScale: scale)
+    renderScale = maximumResolutionEnabled ? 1.0 : scale
+    defaults.set(targetFPS, forKey: Keys.targetFPS)
+    defaults.set(renderScale, forKey: Keys.renderScale)
+    governor.setUserTargets(fps: targetFPS, renderScale: renderScale)
+  }
+
+  func applyHardwareRecommendation() {
+    qualityPreset = .automatic
+    targetFPS = hardwareProfile.recommendedFPS
+    renderScale = maximumResolutionEnabled ? 1.0 : hardwareProfile.recommendedRenderScale
+    defaults.set(RenderQualityPreset.automatic.rawValue, forKey: Keys.qualityPreset)
+    defaults.set(targetFPS, forKey: Keys.targetFPS)
+    defaults.set(renderScale, forKey: Keys.renderScale)
+    governor.setUserTargets(fps: targetFPS, renderScale: renderScale)
+    statusMessage = "Optimized for \(hardwareProfile.displayName)"
   }
 
   func updateFPS(_ fps: Int) {
@@ -467,9 +531,28 @@ final class AppModel: ObservableObject {
   func updateRenderScale(_ scale: Double) {
     qualityPreset = .custom
     renderScale = min(max(scale, 0.25), 1)
+    if renderScale < 0.999 {
+      maximumResolutionEnabled = false
+      defaults.set(false, forKey: Keys.maximumResolution)
+      governor.setMaximumResolutionEnabled(false)
+    }
     defaults.set(RenderQualityPreset.custom.rawValue, forKey: Keys.qualityPreset)
     defaults.set(renderScale, forKey: Keys.renderScale)
     governor.setUserTargets(fps: targetFPS, renderScale: renderScale)
+  }
+
+  func setMaximumResolutionEnabled(_ enabled: Bool) {
+    maximumResolutionEnabled = enabled
+    defaults.set(enabled, forKey: Keys.maximumResolution)
+    governor.setMaximumResolutionEnabled(enabled)
+
+    if enabled {
+      renderScale = 1.0
+      defaults.set(1.0, forKey: Keys.renderScale)
+      governor.setUserTargets(fps: targetFPS, renderScale: 1.0)
+    } else {
+      governor.setUserTargets(fps: targetFPS, renderScale: renderScale)
+    }
   }
 
   func setAdaptiveQualityEnabled(_ enabled: Bool) {

@@ -159,3 +159,14 @@ Settings now exposes all operational controls through macOS UI tabs: General, Pe
 `UpdateService` checks the repository's GitHub Releases endpoint using `URLSession`. When a newer release exists, it selects the DMG first (PKG as fallback), downloads it to the user's Downloads directory with a collision-safe filename, and opens the installer using `NSWorkspace`.
 
 This is intentionally not a silent self-replacement updater yet. Opening a signed/notarized DMG or PKG keeps installation behavior aligned with standard macOS distribution while still allowing the entire update discovery/download workflow to happen inside LumaWall.
+
+
+## v0.3.2 hardware-aware native-resolution rendering
+
+LumaWall now separates macOS logical points from the actual backing-pixel framebuffer. `DisplayManager` records each display's current `CGDisplayMode.pixelWidth/pixelHeight`, AppKit logical size, backing scale, built-in status and refresh capability.
+
+The previous Metal render-scale code derived `MTKView.drawableSize` from view bounds. On Retina Macs that can mean rendering near logical-point resolution instead of native display pixels. Metal renderers now receive a `DisplayDescriptor` from the engine and explicitly size the drawable from the display's native pixel dimensions. A 100% scale therefore means the actual display framebuffer, not the SwiftUI point size.
+
+`MacHardwareProfile` identifies the current model through `hw.model`, reads the active Metal device name for the Apple chip/GPU, and uses physical memory, processor count and display refresh capability to choose an Automatic FPS target. Resolution remains 100% by default; on battery or thermal pressure the governor reduces FPS before reducing pixel resolution.
+
+Maximum Resolution is a user-visible lock. While enabled, adaptive performance policies keep `renderScale = 1.0`. Users can turn it off to allow lower render scales. Active renderers are also reconfigured when macOS reports display-parameter changes, so connecting a monitor or changing scaling does not require relaunching LumaWall.

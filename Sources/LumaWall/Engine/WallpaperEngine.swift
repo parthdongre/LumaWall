@@ -23,6 +23,7 @@ final class WallpaperEngine {
       controllers[display.id]?.close()
 
       let renderer = RendererFactory.makeRenderer(for: wallpaper.type)
+      renderer.configure(for: display)
       try renderer.load(wallpaper)
       renderer.setProperties(properties)
       renderer.updateAudio(
@@ -41,6 +42,12 @@ final class WallpaperEngine {
     }
     startInteractionUpdatesIfNeeded()
     updatePlaybackState()
+  }
+
+  func refreshDisplays(_ displays: [DisplayDescriptor]) {
+    for display in displays {
+      controllers[display.id]?.updateDisplay(display)
+    }
   }
 
   func removeWallpaper(from displayID: CGDirectDisplayID) {

@@ -7,6 +7,7 @@ protocol WallpaperRenderer: AnyObject {
   func play()
   func pause()
   func stop()
+  func configure(for display: DisplayDescriptor)
   func setFPS(_ fps: Int)
   func setRenderScale(_ scale: Double)
   func updateInteraction(_ state: InteractionState)
@@ -15,6 +16,7 @@ protocol WallpaperRenderer: AnyObject {
 }
 
 extension WallpaperRenderer {
+  func configure(for display: DisplayDescriptor) {}
   func setFPS(_ fps: Int) {}
   func setRenderScale(_ scale: Double) {}
   func updateInteraction(_ state: InteractionState) {}
