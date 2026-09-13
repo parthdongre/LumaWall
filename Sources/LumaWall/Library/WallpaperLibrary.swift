@@ -1,11 +1,9 @@
 import AppKit
 import Foundation
-import SwiftData
 
 @MainActor
 final class WallpaperLibrary {
   private let fileManager = FileManager.default
-  private let context: ModelContext
   private let packageService = WallpaperPackageService()
   private let previewGenerator = PreviewGenerator()
 
@@ -14,15 +12,20 @@ final class WallpaperLibrary {
     return base.appendingPathComponent("LumaWall/Wallpapers", isDirectory: true)
   }
 
-  init(container: ModelContainer) {
-    context = ModelContext(container)
+  private var indexURL: URL {
+    libraryRoot.deletingLastPathComponent().appendingPathComponent("library.json")
+  }
+
+  init() {
     try? fileManager.createDirectory(at: libraryRoot, withIntermediateDirectories: true)
   }
 
   func loadAll() -> [Wallpaper] {
-    let descriptor = FetchDescriptor<StoredWallpaper>(sortBy: [SortDescriptor(\.importedAt)])
-    let persisted = (try? context.fetch(descriptor)) ?? []
-    var result = persisted.compactMap { try? $0.makeWallpaper() }
+    var result = loadRecords()
+      .sorted { $0.importedAt < $1.importedAt }
+      .compactMap { try? $0.makeWallpaper() }
+      .filter { fileManager.fileExists(atPath: $0.entryURL.path) }
+
     if let bundled = bundledAurora(),
       !result.contains(where: { $0.name == bundled.name && $0.author == bundled.author })
     {
@@ -68,9 +71,11 @@ final class WallpaperLibrary {
       wallpaper.thumbnailURL == nil
         || !(wallpaper.thumbnailURL.map { fileManager.fileExists(atPath: $0.path) } ?? false)
     else { return wallpaper }
+
     let directory = libraryRoot.appendingPathComponent(wallpaper.id.uuidString, isDirectory: true)
     try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
     let output = directory.appendingPathComponent("generated-preview.jpg")
+
     do {
       try await previewGenerator.generate(for: wallpaper, destination: output)
       var updated = wallpaper
@@ -83,18 +88,43 @@ final class WallpaperLibrary {
   }
 
   func persist(_ wallpaper: Wallpaper) throws {
-    let id = wallpaper.id
-    let descriptor = FetchDescriptor<StoredWallpaper>(predicate: #Predicate { $0.id == id })
-    if let existing = try context.fetch(descriptor).first {
-      try existing.update(from: wallpaper)
-    } else if wallpaper.packageRootURL?.path.hasPrefix(libraryRoot.path) == true
-      || wallpaper.entryURL.path.hasPrefix(libraryRoot.path)
-    {
-      context.insert(try StoredWallpaper(from: wallpaper))
-    } else {
+    guard
+      wallpaper.packageRootURL?.path.hasPrefix(libraryRoot.path) == true
+        || wallpaper.entryURL.path.hasPrefix(libraryRoot.path)
+    else {
       return
     }
-    try context.save()
+
+    var records = loadRecords()
+    if let index = records.firstIndex(where: { $0.id == wallpaper.id }) {
+      try records[index].update(from: wallpaper)
+    } else {
+      records.append(try StoredWallpaper(from: wallpaper))
+    }
+    try saveRecords(records)
+  }
+
+  private func loadRecords() -> [StoredWallpaper] {
+    guard fileManager.fileExists(atPath: indexURL.path),
+      let data = try? Data(contentsOf: indexURL),
+      let records = try? JSONDecoder().decode([StoredWallpaper].self, from: data)
+    else {
+      return []
+    }
+    return records
+  }
+
+  private func saveRecords(_ records: [StoredWallpaper]) throws {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    encoder.dateEncodingStrategy = .iso8601
+
+    // Keep decoding backward-compatible with the default Date encoding used before this point.
+    // We therefore write with the default strategy for now.
+    let stableEncoder = JSONEncoder()
+    stableEncoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let data = try stableEncoder.encode(records)
+    try data.write(to: indexURL, options: .atomic)
   }
 
   private func importLooseFile(_ source: URL, id: UUID) throws -> Wallpaper {

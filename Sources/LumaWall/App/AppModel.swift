@@ -2,7 +2,6 @@ import AppKit
 import Combine
 import CoreGraphics
 import Foundation
-import SwiftData
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -16,6 +15,7 @@ final class AppModel: ObservableObject {
   @Published var propertyValues: [UUID: [String: WallpaperPropertyValue]] = [:]
   @Published var systemAudioEnabled = false
   @Published var lastError: String?
+  @Published var sidebarSelection: SidebarDestination? = .library
 
   let engine = WallpaperEngine()
   let governor = PerformanceGovernor()
@@ -23,24 +23,10 @@ final class AppModel: ObservableObject {
   let automation = WallpaperAutomationController()
   let launchAtLogin = LaunchAtLoginController()
   let library: WallpaperLibrary
-  private let container: ModelContainer
   private var cancellables = Set<AnyCancellable>()
 
   init() {
-    do {
-      let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("LumaWall", isDirectory: true)
-      try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-      let configuration = ModelConfiguration(
-        "LumaWall",
-        schema: Schema([StoredWallpaper.self]),
-        url: base.appendingPathComponent("LumaWall.store")
-      )
-      container = try ModelContainer(for: StoredWallpaper.self, configurations: configuration)
-    } catch {
-      fatalError("Could not initialize LumaWall database: \(error)")
-    }
-    library = WallpaperLibrary(container: container)
+    library = WallpaperLibrary()
     wallpapers = library.loadAll()
     displays = DisplayManager.connectedDisplays()
     selectedWallpaperID = wallpapers.first?.id

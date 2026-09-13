@@ -1,9 +1,7 @@
 import Foundation
-import SwiftData
 
-@Model
-final class StoredWallpaper {
-  @Attribute(.unique) var id: UUID
+struct StoredWallpaper: Codable, Identifiable {
+  var id: UUID
   var name: String
   var author: String
   var typeRaw: String
@@ -31,7 +29,7 @@ final class StoredWallpaper {
     self.importedAt = importedAt
   }
 
-  func update(from wallpaper: Wallpaper) throws {
+  mutating func update(from wallpaper: Wallpaper) throws {
     name = wallpaper.name
     author = wallpaper.author
     typeRaw = wallpaper.type.rawValue
@@ -48,6 +46,7 @@ final class StoredWallpaper {
     guard let type = WallpaperType(rawValue: typeRaw) else {
       throw WallpaperError.invalidManifest("Unknown wallpaper type: \(typeRaw)")
     }
+
     return Wallpaper(
       id: id,
       name: name,
