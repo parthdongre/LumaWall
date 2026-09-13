@@ -4,7 +4,13 @@ LumaWall can be used directly from SwiftPM during development, but normal users 
 
 ## Build installable artifacts
 
-From the repository root:
+From the repository root, verify the Apple developer toolchain first:
+
+```bash
+make doctor
+```
+
+Then package:
 
 ```bash
 make package
