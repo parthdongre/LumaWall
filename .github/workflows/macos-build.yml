@@ -24,6 +24,24 @@ jobs:
       - name: Tests
         run: swift test
 
+      - name: Capture actual LumaWall UI
+        if: github.event_name == 'push'
+        env:
+          LUMAWALL_SCREENSHOT_DIR: ${{ runner.temp }}/lumawall-screenshots
+        run: |
+          mkdir -p "$LUMAWALL_SCREENSHOT_DIR"
+          swift test
+          ls -lh "$LUMAWALL_SCREENSHOT_DIR"
+
+      - name: Upload UI screenshots
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LumaWall-UI-${{ github.sha }}
+          path: ${{ runner.temp }}/lumawall-screenshots/*.png
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Package installable macOS artifacts
         if: github.event_name == 'push'
         env:
@@ -32,6 +50,19 @@ jobs:
         run: |
           chmod +x scripts/package-macos.sh
           ./scripts/package-macos.sh
+
+      - name: Smoke-launch packaged LumaWall.app
+        if: github.event_name == 'push'
+        run: |
+          defaults write dev.parthdongre.LumaWall onboarding.completed -bool true
+          defaults write dev.parthdongre.LumaWall startup.restoreAssignments -bool false
+          open -na "$PWD/dist/LumaWall.app"
+          sleep 5
+          if ! pgrep -x LumaWall >/dev/null; then
+            echo "Packaged LumaWall.app did not remain running." >&2
+            exit 1
+          fi
+          pkill -x LumaWall || true
 
       - name: Upload macOS installer artifacts
         if: github.event_name == 'push'
