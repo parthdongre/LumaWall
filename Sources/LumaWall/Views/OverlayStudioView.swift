@@ -178,77 +178,16 @@ struct OverlayStudioView: View {
     }
   }
 
-  @ViewBuilder
   private func previewClock(
     date: Date,
     settings: TimeDateOverlaySettings,
     previewWidth: CGFloat
   ) -> some View {
-    let scale = min(
-      max(previewWidth / 1500, CGFloat(0.20)),
-      CGFloat(0.62)
+    OverlayClockPreview(
+      date: date,
+      settings: settings,
+      previewWidth: previewWidth
     )
-    let textColor = Color(hex: settings.colorHex)
-      .opacity(settings.opacity)
-
-    VStack(spacing: max(2, 5 * scale)) {
-      Text(formattedTime(date, settings: settings))
-        .font(
-          .system(
-            size: max(CGFloat(16), CGFloat(settings.timeFontSize) * scale),
-            weight: settings.fontWeight.swiftUIWeight,
-            design: .monospaced
-          )
-        )
-        .monospacedDigit()
-        .lineLimit(1)
-
-      if settings.dateStyle != .none {
-        Text(formattedDate(date, settings: settings))
-          .font(
-            .system(
-              size: max(CGFloat(9), CGFloat(settings.dateFontSize) * scale),
-              weight: .medium
-            )
-          )
-          .lineLimit(1)
-      }
-
-      ForEach(settings.additionalTimeZoneIdentifiers.prefix(3), id: .self) { identifier in
-        if TimeZone(identifier: identifier) != nil {
-          Text(worldClockText(date, identifier: identifier, settings: settings))
-            .font(
-              .system(
-                size: max(CGFloat(8), CGFloat(settings.dateFontSize - 2) * scale),
-                weight: .regular,
-                design: .monospaced
-              )
-            )
-            .opacity(0.8)
-        }
-      }
-    }
-    .foregroundStyle(textColor)
-    .padding(.horizontal, max(10, 24 * scale))
-    .padding(.vertical, max(8, 18 * scale))
-    .background {
-      if settings.glassEnabled {
-        RoundedRectangle(cornerRadius: max(CGFloat(8), CGFloat(settings.cornerRadius) * scale))
-          .fill(.ultraThinMaterial)
-          .opacity(settings.glassOpacity)
-      }
-    }
-    .background(
-      Color.black.opacity(settings.backgroundOpacity),
-      in: RoundedRectangle(cornerRadius: max(CGFloat(8), CGFloat(settings.cornerRadius) * scale))
-    )
-    .shadow(
-      color: settings.shadow ? .black.opacity(0.55) : .clear,
-      radius: settings.shadow ? max(4, 12 * scale) : 0,
-      y: settings.shadow ? max(1, 3 * scale) : 0
-    )
-    .contentShape(Rectangle())
-    .help("Drag to position")
   }
 
   private func controls(for wallpaper: Wallpaper) -> some View {
@@ -632,7 +571,116 @@ struct OverlayStudioView: View {
       .background(.quaternary, in: Capsule())
   }
 
-  private func formattedTime(
+
+}
+
+private struct OverlayClockPreview: View {
+  let date: Date
+  let settings: TimeDateOverlaySettings
+  let previewWidth: CGFloat
+
+  private var scale: CGFloat {
+    min(
+      max(previewWidth / 1500, CGFloat(0.20)),
+      CGFloat(0.62)
+    )
+  }
+
+  private var textColor: Color {
+    Color(hex: settings.colorHex)
+      .opacity(settings.opacity)
+  }
+
+  private var cornerRadius: CGFloat {
+    max(CGFloat(8), CGFloat(settings.cornerRadius) * scale)
+  }
+
+  var body: some View {
+    VStack(spacing: max(CGFloat(2), CGFloat(5) * scale)) {
+      timeText
+      dateText
+      worldClocks
+    }
+    .foregroundStyle(textColor)
+    .padding(.horizontal, max(CGFloat(10), CGFloat(24) * scale))
+    .padding(.vertical, max(CGFloat(8), CGFloat(18) * scale))
+    .background(glassBackground)
+    .background(
+      Color.black.opacity(settings.backgroundOpacity),
+      in: RoundedRectangle(cornerRadius: cornerRadius)
+    )
+    .shadow(
+      color: settings.shadow ? .black.opacity(0.55) : .clear,
+      radius: settings.shadow ? max(CGFloat(4), CGFloat(12) * scale) : 0,
+      y: settings.shadow ? max(CGFloat(1), CGFloat(3) * scale) : 0
+    )
+    .contentShape(Rectangle())
+    .help("Drag to position")
+  }
+
+  private var timeText: some View {
+    Text(OverlayClockText.time(date, settings: settings))
+      .font(
+        .system(
+          size: max(CGFloat(16), CGFloat(settings.timeFontSize) * scale),
+          weight: settings.fontWeight.swiftUIWeight,
+          design: .monospaced
+        )
+      )
+      .monospacedDigit()
+      .lineLimit(1)
+  }
+
+  @ViewBuilder
+  private var dateText: some View {
+    if settings.dateStyle != .none {
+      Text(OverlayClockText.date(date, settings: settings))
+        .font(
+          .system(
+            size: max(CGFloat(9), CGFloat(settings.dateFontSize) * scale),
+            weight: .medium
+          )
+        )
+        .lineLimit(1)
+    }
+  }
+
+  private var worldClocks: some View {
+    VStack(spacing: 2) {
+      ForEach(Array(settings.additionalTimeZoneIdentifiers.prefix(3)), id: \.self) { identifier in
+        if TimeZone(identifier: identifier) != nil {
+          Text(
+            OverlayClockText.worldClock(
+              date,
+              identifier: identifier,
+              settings: settings
+            )
+          )
+          .font(
+            .system(
+              size: max(CGFloat(8), CGFloat(settings.dateFontSize - 2) * scale),
+              weight: .regular,
+              design: .monospaced
+            )
+          )
+          .opacity(0.8)
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var glassBackground: some View {
+    if settings.glassEnabled {
+      RoundedRectangle(cornerRadius: cornerRadius)
+        .fill(.ultraThinMaterial)
+        .opacity(settings.glassOpacity)
+    }
+  }
+}
+
+private enum OverlayClockText {
+  static func time(
     _ date: Date,
     settings: TimeDateOverlaySettings
   ) -> String {
@@ -657,7 +705,7 @@ struct OverlayStudioView: View {
     return formatter.string(from: date)
   }
 
-  private func formattedDate(
+  static func date(
     _ date: Date,
     settings: TimeDateOverlaySettings
   ) -> String {
@@ -687,7 +735,7 @@ struct OverlayStudioView: View {
     return settings.uppercaseDate ? text.uppercased() : text
   }
 
-  private func worldClockText(
+  static func worldClock(
     _ date: Date,
     identifier: String,
     settings: TimeDateOverlaySettings
