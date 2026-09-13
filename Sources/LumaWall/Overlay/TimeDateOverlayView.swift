@@ -54,8 +54,12 @@ final class TimeDateOverlayView: NSView {
     fatalError("init(coder:) has not been implemented")
   }
 
-  deinit {
-    timer?.invalidate()
+  override func viewWillMove(toWindow newWindow: NSWindow?) {
+    if newWindow == nil {
+      timer?.invalidate()
+      timer = nil
+    }
+    super.viewWillMove(toWindow: newWindow)
   }
 
   func apply(_ settings: TimeDateOverlaySettings) {
