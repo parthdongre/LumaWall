@@ -114,6 +114,62 @@ struct DiagnosticsView: View {
           .frame(maxWidth: .infinity, alignment: .leading)
         }
 
+        GroupBox("Renderer profiler") {
+          VStack(alignment: .leading, spacing: 10) {
+            if model.engine.rendererSnapshots.isEmpty {
+              Text("No active renderers.")
+                .foregroundStyle(.secondary)
+            } else {
+              ForEach(model.engine.rendererSnapshots) { snapshot in
+                VStack(alignment: .leading, spacing: 4) {
+                  HStack {
+                    Text(snapshot.displayName)
+                      .font(.headline)
+                    Spacer()
+                    Text(snapshot.diagnostics.rendererName)
+                      .font(.caption.monospaced())
+                      .foregroundStyle(.secondary)
+                  }
+
+                  Text(
+                    "\(snapshot.diagnostics.pixelWidth) × \(snapshot.diagnostics.pixelHeight) • \(snapshot.diagnostics.preferredFPS) FPS • \(Int(snapshot.diagnostics.renderScale * 100))%"
+                  )
+                  .font(.caption.monospacedDigit())
+                  .foregroundStyle(.secondary)
+
+                  if let rate = snapshot.diagnostics.playbackRate {
+                    Text(
+                      "Video \(String(format: "%.2f×", rate)) • "
+                        + ((snapshot.diagnostics.muted ?? true) ? "muted" : "audio on")
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                  }
+                }
+                .padding(.vertical, 4)
+              }
+            }
+          }
+        }
+
+        GroupBox("Power") {
+          VStack(alignment: .leading, spacing: 8) {
+            diagnosticRow("Source", model.power.snapshot.source.displayName)
+            diagnosticRow(
+              "Battery",
+              model.power.snapshot.percent.map { "\($0)%" } ?? "Unavailable"
+            )
+            diagnosticRow(
+              "Charging",
+              model.power.snapshot.isCharging ? "Yes" : "No"
+            )
+            diagnosticRow(
+              "Automatic profiles",
+              model.usePowerProfiles ? "Enabled" : "Disabled"
+            )
+          }
+        }
+
         GroupBox("Foreground activity") {
           VStack(alignment: .leading, spacing: 8) {
             diagnosticRow(

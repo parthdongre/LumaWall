@@ -149,6 +149,92 @@ struct WallpaperDetailView: View {
           }
         }
 
+        GroupBox("Presentation") {
+          VStack(alignment: .leading, spacing: 14) {
+            Picker(
+              "Wallpaper fit",
+              selection: Binding(
+                get: {
+                  model.fitModes[wallpaper.id] ?? .fill
+                },
+                set: {
+                  model.setFitMode($0, for: wallpaper.id)
+                }
+              )
+            ) {
+              ForEach(WallpaperFitMode.allCases) { mode in
+                Text(mode.displayName)
+                  .tag(mode)
+              }
+            }
+
+            if currentWallpaper.type == .video {
+              let settings = model.videoSettings(for: wallpaper.id)
+
+              HStack {
+                Text("Playback speed")
+                Slider(
+                  value: Binding(
+                    get: { settings.playbackRate },
+                    set: { value in
+                      var updated = model.videoSettings(for: wallpaper.id)
+                      updated.playbackRate = value
+                      model.updateVideoSettings(updated, for: wallpaper.id)
+                    }
+                  ),
+                  in: 0.25...2,
+                  step: 0.05
+                )
+                Text(String(format: "%.2f×", settings.playbackRate))
+                  .monospacedDigit()
+                  .frame(width: 52)
+              }
+
+              Toggle(
+                "Mute video audio",
+                isOn: Binding(
+                  get: { settings.muted },
+                  set: { enabled in
+                    var updated = model.videoSettings(for: wallpaper.id)
+                    updated.muted = enabled
+                    model.updateVideoSettings(updated, for: wallpaper.id)
+                  }
+                )
+              )
+
+              Toggle(
+                "Loop video",
+                isOn: Binding(
+                  get: { settings.loop },
+                  set: { enabled in
+                    var updated = model.videoSettings(for: wallpaper.id)
+                    updated.loop = enabled
+                    model.updateVideoSettings(updated, for: wallpaper.id)
+                  }
+                )
+              )
+            }
+          }
+        }
+
+        if model.isQuarantined(wallpaper.id) {
+          GroupBox("Stability") {
+            HStack {
+              Label(
+                "This wallpaper was disabled after repeated unclean exits.",
+                systemImage: "exclamationmark.shield.fill"
+              )
+              .foregroundStyle(.orange)
+
+              Spacer()
+
+              Button("Re-enable") {
+                model.allowQuarantinedWallpaper(wallpaper.id)
+              }
+            }
+          }
+        }
+
         if !currentWallpaper.properties.isEmpty {
           GroupBox("Creator controls") {
             VStack(alignment: .leading, spacing: 14) {

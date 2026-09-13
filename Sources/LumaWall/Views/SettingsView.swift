@@ -213,6 +213,84 @@ struct SettingsView: View {
         }
       }
 
+      Section("Wallpaper transitions") {
+        Picker(
+          "Transition",
+          selection: Binding(
+            get: { model.transitionStyle },
+            set: { model.setTransitionStyle($0) }
+          )
+        ) {
+          ForEach(WallpaperTransitionStyle.allCases) { style in
+            Text(style.displayName)
+              .tag(style)
+          }
+        }
+
+        HStack {
+          Text("Duration")
+          Slider(
+            value: Binding(
+              get: { model.transitionDuration },
+              set: { model.setTransitionDuration($0) }
+            ),
+            in: 0...3,
+            step: 0.1
+          )
+          Text(String(format: "%.1fs", model.transitionDuration))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            .frame(width: 44)
+        }
+
+        Text(
+          "Crossfade and Soft Zoom keep the old renderer alive until the incoming wallpaper is visible, then retire it safely."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+
+      Section("Power profiles") {
+        Toggle(
+          "Use automatic power profiles",
+          isOn: Binding(
+            get: { model.usePowerProfiles },
+            set: { model.setUsePowerProfiles($0) }
+          )
+        )
+
+        LabeledContent(
+          "Current power source",
+          value: model.power.snapshot.source.displayName
+        )
+
+        if let percent = model.power.snapshot.percent {
+          LabeledContent(
+            "Battery",
+            value: "\(percent)%"
+          )
+        }
+
+        powerProfileRow(
+          title: "Plugged In",
+          profile: model.pluggedInProfile,
+          source: .ac
+        )
+
+        powerProfileRow(
+          title: "Battery",
+          profile: model.batteryProfile,
+          source: .battery
+        )
+
+        powerProfileRow(
+          title: "Low Power Mode",
+          profile: model.lowPowerProfile,
+          source: .battery,
+          lowPower: true
+        )
+      }
+
       Section("Automatic performance") {
         Toggle(
           "Adaptive battery and thermal quality",
@@ -365,12 +443,98 @@ struct SettingsView: View {
         }
       }
 
+      Section("Crash quarantine") {
+        let quarantined = model.wallpapers.filter {
+          model.isQuarantined($0.id)
+        }
+
+        if quarantined.isEmpty {
+          Label(
+            "No quarantined wallpapers",
+            systemImage: "checkmark.shield"
+          )
+          .foregroundStyle(.secondary)
+        } else {
+          ForEach(quarantined) { wallpaper in
+            HStack {
+              VStack(alignment: .leading) {
+                Text(wallpaper.name)
+                Text("Disabled after repeated unclean exits")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+
+              Spacer()
+
+              Button("Re-enable") {
+                model.allowQuarantinedWallpaper(wallpaper.id)
+              }
+            }
+          }
+        }
+      }
+
       if let error = model.lastError {
         Section("Last error") {
           Text(error)
             .textSelection(.enabled)
             .foregroundStyle(.red)
         }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func powerProfileRow(
+    title: String,
+    profile: PowerPerformanceProfile,
+    source: MacPowerSource,
+    lowPower: Bool = false
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(title)
+        .font(.headline)
+
+      HStack {
+        Picker(
+          "FPS",
+          selection: Binding(
+            get: { profile.fps },
+            set: { newFPS in
+              var updated = profile
+              updated.fps = newFPS
+              model.updatePowerProfile(
+                updated,
+                for: source,
+                lowPower: lowPower
+              )
+            }
+          )
+        ) {
+          Text("30").tag(30)
+          Text("60").tag(60)
+          Text("120").tag(120)
+        }
+        .pickerStyle(.segmented)
+
+        Toggle(
+          "Native resolution",
+          isOn: Binding(
+            get: { profile.maximumResolution },
+            set: { enabled in
+              var updated = profile
+              updated.maximumResolution = enabled
+              if enabled {
+                updated.renderScale = 1
+              }
+              model.updatePowerProfile(
+                updated,
+                for: source,
+                lowPower: lowPower
+              )
+            }
+          )
+        )
       }
     }
   }
