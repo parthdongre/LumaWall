@@ -137,7 +137,7 @@ ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
 echo "==> Creating styled DMG"
 DMG_ROOT="$(mktemp -d)"
-MOUNT_DIR="$(mktemp -d)"
+MOUNT_DIR="/Volumes/$VOLUME_NAME"
 RW_DMG="$DIST/LumaWall-$VERSION-rw.dmg"
 VOLUME_NAME="LumaWall $VERSION"
 
@@ -145,7 +145,7 @@ cleanup() {
   if mount | grep -Fq "$MOUNT_DIR"; then
     hdiutil detach "$MOUNT_DIR" -quiet || true
   fi
-  rm -rf "$DMG_ROOT" "$MOUNT_DIR"
+  rm -rf "$DMG_ROOT"
   rm -f "$RW_DMG"
 }
 trap cleanup EXIT
@@ -172,6 +172,15 @@ hdiutil attach \
 
 osascript <<APPLESCRIPT
 tell application "Finder"
+  repeat 40 times
+    if exists disk "$VOLUME_NAME" then exit repeat
+    delay 0.25
+  end repeat
+
+  if not (exists disk "$VOLUME_NAME") then
+    error "Mounted LumaWall DMG did not become visible to Finder."
+  end if
+
   tell disk "$VOLUME_NAME"
     open
     set current view of container window to icon view
