@@ -216,15 +216,38 @@ final class WallpaperLibrary {
     return wallpapers.filter { seen.insert($0.id).inserted }
   }
 
+  private func resourceRoots() -> [URL] {
+    var roots: [URL] = []
+
+    if Bundle.main.bundlePath.hasSuffix(".app"), let resources = Bundle.main.resourceURL {
+      let nestedBundleURL = resources.appendingPathComponent(
+        "LumaWall_LumaWall.bundle",
+        isDirectory: true
+      )
+      if let nestedBundle = Bundle(url: nestedBundleURL),
+        let nestedResources = nestedBundle.resourceURL
+      {
+        roots.append(nestedResources)
+      }
+      roots.append(resources)
+    } else if let swiftPMResources = Bundle.module.resourceURL {
+      roots.append(swiftPMResources)
+    }
+
+    var seen = Set<String>()
+    return roots.filter { seen.insert($0.standardizedFileURL.path).inserted }
+  }
+
   private func builtInWallpaperRoots() -> [URL] {
-    let candidates: [URL?] = [
-      Bundle.module.resourceURL?
-        .appendingPathComponent("BuiltInWallpapers", isDirectory: true),
-      Bundle.module.resourceURL?
-        .appendingPathComponent("Resources", isDirectory: true)
-        .appendingPathComponent("BuiltInWallpapers", isDirectory: true),
-    ]
-    return candidates.compactMap { $0 }.filter {
+    let candidates = resourceRoots().flatMap { root in
+      [
+        root.appendingPathComponent("BuiltInWallpapers", isDirectory: true),
+        root.appendingPathComponent("Resources", isDirectory: true)
+          .appendingPathComponent("BuiltInWallpapers", isDirectory: true),
+      ]
+    }
+
+    return candidates.filter {
       var isDirectory: ObjCBool = false
       return fileManager.fileExists(atPath: $0.path, isDirectory: &isDirectory)
         && isDirectory.boolValue
@@ -232,21 +255,17 @@ final class WallpaperLibrary {
   }
 
   private func bundledAurora() -> Wallpaper? {
-    let candidates: [URL?] = [
-      Bundle.module.url(
-        forResource: "Aurora", withExtension: "metal", subdirectory: "Shaders"),
-      Bundle.module.url(
-        forResource: "Aurora", withExtension: "metal", subdirectory: "Resources/Shaders"),
-      Bundle.module.resourceURL?
-        .appendingPathComponent("Resources", isDirectory: true)
-        .appendingPathComponent("Shaders", isDirectory: true)
-        .appendingPathComponent("Aurora.metal"),
-    ]
+    let candidates = resourceRoots().flatMap { root in
+      [
+        root.appendingPathComponent("Shaders/Aurora.metal"),
+        root.appendingPathComponent("Resources/Shaders/Aurora.metal"),
+      ]
+    }
 
     guard
-      let shaderURL = candidates
-        .compactMap({ $0 })
-        .first(where: { fileManager.fileExists(atPath: $0.path) })
+      let shaderURL = candidates.first(where: {
+        fileManager.fileExists(atPath: $0.path)
+      })
     else { return nil }
 
     return Wallpaper(

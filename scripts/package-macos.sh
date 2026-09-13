@@ -32,7 +32,6 @@ chmod +x "$MACOS/LumaWall"
 RESOURCE_BUNDLE="$(find "$BIN_DIR" -maxdepth 2 -type d -name 'LumaWall_LumaWall.bundle' -print -quit)"
 if [[ -n "$RESOURCE_BUNDLE" ]]; then
   ditto "$RESOURCE_BUNDLE" "$RESOURCES/LumaWall_LumaWall.bundle"
-  ln -s "Contents/Resources/LumaWall_LumaWall.bundle" "$APP/LumaWall_LumaWall.bundle"
 else
   echo "SwiftPM resource bundle was not found." >&2
   exit 1

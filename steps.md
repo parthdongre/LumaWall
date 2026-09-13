@@ -137,3 +137,10 @@ Diagnostics are generated from runtime state rather than collecting private user
 SwiftPM remains the source build system, while `scripts/package-macos.sh` assembles the release executable and SwiftPM resource bundle into a conventional `.app` layout. The app is ad-hoc signed when no Developer ID is supplied, then packaged into ZIP, DMG and PKG outputs with checksums.
 
 The app bundle registers the `.wall` document type, and AppKit's application delegate forwards Finder-opened wallpaper packages into the existing importer. GitHub Actions performs packaging on macOS after build/tests so distribution errors are caught separately from source compilation.
+
+
+## App-bundle resource sealing fix
+
+The first v0.3 packaging run exposed a macOS code-signing rule: arbitrary files or symlinks at the root of an `.app` bundle are considered unsealed contents. The SwiftPM resource-bundle compatibility symlink was therefore removed.
+
+Packaged builds now keep `LumaWall_LumaWall.bundle` exclusively under `Contents/Resources`, and `WallpaperLibrary` resolves that nested bundle explicitly when `Bundle.main` is an installed app. Development runs still use `Bundle.module`. This preserves Command Line Tools development while producing a standards-compliant signed app bundle.
