@@ -71,7 +71,7 @@ final class AppModel: ObservableObject {
     p.canChooseFiles = true
     p.allowsMultipleSelection = false
     p.prompt = "Import"
-    guard p.runModal()==.OK, let url = p.url else { return }
+    guard p.runModal() == .OK, let url = p.url else { return }
     do {
       var w = try library.importWallpaper(from: url)
       w = try requestSensitivePermissions(for: w)
@@ -90,7 +90,7 @@ final class AppModel: ObservableObject {
     guard let w = selectedWallpaper else { return }
     let p = NSSavePanel()
     p.nameFieldStringValue = "\(w.name).wall"
-    guard p.runModal()==.OK, var url = p.url else { return }
+    guard p.runModal() == .OK, var url = p.url else { return }
     if url.pathExtension.lowercased() != "wall" { url.appendPathExtension("wall") }
     do { try library.exportWallpaper(w, to: url) } catch { show(error) }
   }
@@ -218,7 +218,7 @@ final class AppModel: ObservableObject {
       "\(wallpaper.name) requests: \(pending.map(\.displayName).sorted().joined(separator:", ")). Grant these permissions?"
     alert.addButton(withTitle: "Grant")
     alert.addButton(withTitle: "Keep Blocked")
-    guard alert.runModal()==.alertFirstButtonReturn else { return wallpaper }
+    guard alert.runModal() == .alertFirstButtonReturn else { return wallpaper }
     return try library.grant(Set(pending), to: wallpaper)
   }
   private func show(_ error: Error) {

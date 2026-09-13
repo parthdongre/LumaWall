@@ -1,5 +1,6 @@
 import WebKit
 
+@MainActor
 enum WebSecurityPolicy {
   static func baseConfiguration() -> WKWebViewConfiguration {
     let config = WKWebViewConfiguration()
@@ -62,8 +63,8 @@ enum WebSecurityPolicy {
     let json = #"[{"trigger":{"url-filter":"^https?://"},"action":{"type":"block"}}]"#
     WKContentRuleListStore.default().compileContentRuleList(
       forIdentifier: "LumaWall.BlockRemoteNetwork.v1", encodedContentRuleList: json
-    ) { list, error in
-      DispatchQueue.main.async {
+    ) { list, _ in
+      Task { @MainActor in
         if let list {
           controller.add(list)
           completion(true)

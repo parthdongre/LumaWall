@@ -76,3 +76,8 @@ Web wallpapers use a non-persistent WebKit data store. Remote HTTP/HTTPS subreso
 ## Known validation boundary
 
 The source has been Swift parser-validated in the development environment. Apple-framework type checking and runtime behavior must run on macOS. The included GitHub Actions workflow is configured to build/test on `macos-15` after the repository is published.
+
+
+## macOS CI / Swift 6 compatibility
+
+The macOS CI build is treated as the source of truth for Apple-framework type checking. Swift 6 marks AppKit/WebKit UI APIs as main-actor isolated, while `Timer` callbacks are sendable/nonisolated closures. Timer callbacks therefore enter `Task { @MainActor in ... }` before touching UI-owned state, and `WebSecurityPolicy` is main-actor isolated because it constructs and mutates WebKit objects. We keep these explicit actor boundaries rather than disabling strict concurrency checking.

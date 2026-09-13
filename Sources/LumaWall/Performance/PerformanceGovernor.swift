@@ -32,7 +32,9 @@ final class PerformanceGovernor: ObservableObject {
     monitor.start()
     timer?.invalidate()
     timer = .scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-      self?.evaluate()
+      Task { @MainActor [weak self] in
+        self?.evaluate()
+      }
     }
     evaluate()
   }

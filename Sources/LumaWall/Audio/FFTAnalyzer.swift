@@ -47,8 +47,14 @@ final class FFTAnalyzer: @unchecked Sendable {
       }
       len <<= 1
     }
-    let mags = (0..<(size / 2)).map {
-      min(1, sqrt(real[$0] * real[$0] + imag[$0] * imag[$0]) / Float(size) * 8)
+    var mags = [Float]()
+    mags.reserveCapacity(size / 2)
+    for index in 0..<(size / 2) {
+      let realPart = real[index]
+      let imaginaryPart = imag[index]
+      let magnitude = sqrt(realPart * realPart + imaginaryPart * imaginaryPart)
+      let normalized = magnitude / Float(size) * 8
+      mags.append(min(Float(1), normalized))
     }
     func band(_ low: Float, _ high: Float) -> Float {
       let a = max(1, Int(low * Float(size) / sampleRate))

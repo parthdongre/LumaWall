@@ -16,7 +16,9 @@ final class FullscreenMonitor {
   func start() {
     timer?.invalidate()
     timer = .scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-      self?.evaluate()
+      Task { @MainActor [weak self] in
+        self?.evaluate()
+      }
     }
     evaluate()
   }

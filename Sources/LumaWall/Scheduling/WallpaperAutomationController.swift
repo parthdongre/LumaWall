@@ -18,7 +18,9 @@ final class WallpaperAutomationController: ObservableObject {
   init() {
     load()
     scheduleTimer = .scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-      self?.evaluateSchedules()
+      Task { @MainActor [weak self] in
+        self?.evaluateSchedules()
+      }
     }
   }
 
@@ -30,7 +32,9 @@ final class WallpaperAutomationController: ObservableObject {
       withTimeInterval: max(10, playlist.intervalSeconds),
       repeats: true
     ) { [weak self] _ in
-      self?.advance()
+      Task { @MainActor [weak self] in
+        self?.advance()
+      }
     }
   }
 
