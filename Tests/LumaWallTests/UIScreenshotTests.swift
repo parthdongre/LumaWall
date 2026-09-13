@@ -19,7 +19,8 @@ func captureMacOSUIScreenshots() async throws {
     withIntermediateDirectories: true
   )
 
-  NSApp.appearance = NSAppearance(named: .darkAqua)
+  let application = NSApplication.shared
+  application.appearance = NSAppearance(named: .darkAqua)
   UserDefaults.standard.set(true, forKey: "onboarding.completed")
   UserDefaults.standard.set(false, forKey: "startup.safeModeNextLaunch")
   UserDefaults.standard.set(false, forKey: "startup.restoreAssignments")
