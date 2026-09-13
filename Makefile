@@ -1,19 +1,22 @@
-.PHONY: run build test clean package install
+.PHONY: doctor run build test clean package install
 
-run:
+doctor:
+	bash scripts/doctor.sh
+
+run: doctor
 	swift run LumaWall
 
-build:
+build: doctor
 	swift build
 
-test:
+test: doctor
 	swift test
 
 clean:
 	rm -rf .build dist
 
-package:
+package: doctor
 	./scripts/package-macos.sh
 
-install:
+install: doctor
 	./scripts/install-local.sh
