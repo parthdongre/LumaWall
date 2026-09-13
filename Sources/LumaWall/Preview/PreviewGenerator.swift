@@ -22,38 +22,63 @@ private struct PreviewMetalUniforms {
 
 @MainActor
 final class PreviewGenerator: NSObject {
-  private let size = CGSize(width: 640, height: 360)
+  static let libraryPreviewSize = CGSize(width: 640, height: 360)
 
   func generate(for wallpaper: Wallpaper, destination: URL) async throws {
-    let image: NSImage
+    let image = try await renderImage(
+      for: wallpaper,
+      targetSize: Self.libraryPreviewSize
+    )
+    try writeJPEG(image, targetSize: Self.libraryPreviewSize, to: destination)
+  }
+
+  func renderImage(
+    for wallpaper: Wallpaper,
+    targetSize: CGSize,
+    propertyValues: [String: WallpaperPropertyValue] = [:]
+  ) async throws -> NSImage {
+    let size = CGSize(
+      width: max(1, targetSize.width),
+      height: max(1, targetSize.height)
+    )
+
     switch wallpaper.type {
     case .image:
       guard let loaded = NSImage(contentsOf: wallpaper.entryURL) else {
         throw WallpaperError.unreadableAsset(wallpaper.entryURL)
       }
-      image = loaded
+      return loaded
     case .video:
-      image = try videoPreview(url: wallpaper.entryURL)
+      return try videoPreview(url: wallpaper.entryURL, targetSize: size)
     case .web:
-      image = try await webPreview(
+      return try await webPreview(
         url: wallpaper.entryURL,
-        allowNetwork: wallpaper.grantedPermissions.contains(.network)
+        allowNetwork: wallpaper.grantedPermissions.contains(.network),
+        targetSize: size
       )
     case .metal:
-      image = try metalPreview(wallpaper: wallpaper)
+      return try metalPreview(
+        wallpaper: wallpaper,
+        targetSize: size,
+        propertyValues: propertyValues
+      )
     }
-    try writeJPEG(image, to: destination)
   }
 
-  private func videoPreview(url: URL) throws -> NSImage {
+  private func videoPreview(url: URL, targetSize: CGSize) throws -> NSImage {
     let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
     generator.appliesPreferredTrackTransform = true
+    generator.maximumSize = targetSize
     let cg = try generator.copyCGImage(
       at: CMTime(seconds: 1, preferredTimescale: 600), actualTime: nil)
     return NSImage(cgImage: cg, size: .zero)
   }
 
-  private func webPreview(url: URL, allowNetwork: Bool) async throws -> NSImage {
+  private func webPreview(
+    url: URL,
+    allowNetwork: Bool,
+    targetSize: CGSize
+  ) async throws -> NSImage {
     let config = WebSecurityPolicy.baseConfiguration()
     if !allowNetwork {
       let ok = await withCheckedContinuation { continuation in
@@ -65,7 +90,10 @@ final class PreviewGenerator: NSObject {
         throw WallpaperError.permissionDenied("Could not initialize web network sandbox")
       }
     }
-    let webView = WKWebView(frame: CGRect(origin: .zero, size: size), configuration: config)
+    let webView = WKWebView(
+      frame: CGRect(origin: .zero, size: targetSize),
+      configuration: config
+    )
     let delegate = SnapshotNavigationDelegate()
     webView.navigationDelegate = delegate
     webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
@@ -74,7 +102,11 @@ final class PreviewGenerator: NSObject {
     return try await webView.takeSnapshot(configuration: nil)
   }
 
-  private func metalPreview(wallpaper: Wallpaper) throws -> NSImage {
+  private func metalPreview(
+    wallpaper: Wallpaper,
+    targetSize: CGSize,
+    propertyValues: [String: WallpaperPropertyValue]
+  ) throws -> NSImage {
     guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
       throw WallpaperError.packageOperationFailed("Metal is unavailable")
     }
@@ -87,8 +119,8 @@ final class PreviewGenerator: NSObject {
       throw WallpaperError.invalidMetalShader
     }
 
-    let width = Int(size.width)
-    let height = Int(size.height)
+    let width = max(1, Int(targetSize.width.rounded()))
+    let height = max(1, Int(targetSize.height.rounded()))
     let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
       pixelFormat: .bgra8Unorm,
       width: width,
@@ -118,7 +150,10 @@ final class PreviewGenerator: NSObject {
       throw WallpaperError.packageOperationFailed("Could not create Metal preview encoder")
     }
 
-    let slots = propertySlots(for: wallpaper.properties)
+    let slots = propertySlots(
+      for: wallpaper.properties,
+      values: propertyValues
+    )
     var uniforms = PreviewMetalUniforms(
       time: 1.4,
       resolutionX: Float(width),
@@ -151,14 +186,21 @@ final class PreviewGenerator: NSObject {
     guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
       throw WallpaperError.packageOperationFailed("Could not render Metal preview image")
     }
-    return NSImage(cgImage: cgImage, size: size)
+    return NSImage(
+      cgImage: cgImage,
+      size: CGSize(width: width, height: height)
+    )
   }
 
-  private func propertySlots(for definitions: [WallpaperProperty]) -> [SIMD4<Float>] {
+  private func propertySlots(
+    for definitions: [WallpaperProperty],
+    values: [String: WallpaperPropertyValue]
+  ) -> [SIMD4<Float>] {
     var flat = [Float](repeating: 0, count: 16)
     var cursor = 0
     for definition in definitions where cursor < flat.count {
-      switch definition.defaultValue {
+      let resolved = values[definition.id] ?? definition.defaultValue
+      switch resolved {
       case .number(let value):
         flat[cursor] = Float(value)
         cursor += 1
@@ -195,12 +237,16 @@ final class PreviewGenerator: NSObject {
     )
   }
 
-  private func writeJPEG(_ image: NSImage, to url: URL) throws {
-    let target = NSImage(size: size)
+  private func writeJPEG(
+    _ image: NSImage,
+    targetSize: CGSize,
+    to url: URL
+  ) throws {
+    let target = NSImage(size: targetSize)
     target.lockFocus()
     NSColor.black.setFill()
-    NSBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
-    image.draw(in: CGRect(origin: .zero, size: size), from: .zero, operation: .copy, fraction: 1)
+    NSBezierPath(rect: CGRect(origin: .zero, size: targetSize)).fill()
+    image.draw(in: CGRect(origin: .zero, size: targetSize), from: .zero, operation: .copy, fraction: 1)
     target.unlockFocus()
     guard
       let data = target.tiffRepresentation.flatMap({

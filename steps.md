@@ -222,3 +222,14 @@ The existing nine anchor positions remain available and clear the custom coordin
 Overlay Studio exposes typography, 12/24-hour/system time, seconds, date style, weekday, text color/opacity, glass strength, background opacity, corner radius, timezone and up to three additional world clocks. The same AppModel.updateTimeDateSettings path updates active desktop overlays immediately.
 
 The native overlay timer now runs in the common run-loop mode so mouse tracking and editor interactions do not freeze clock updates. CI captures both Creator Studio and Overlay Studio as actual macOS SwiftUI/AppKit screenshots.
+
+
+## v0.4.0 Lock Screen Companion
+
+Lock Screen Companion intentionally stays on public macOS APIs and does not attempt to draw over Apple's secure authentication UI. It generates one still composition per connected display at the display's backing-pixel resolution and hands those assets off through normal Wallpaper / Screen Saver settings.
+
+PreviewGenerator now exposes a reusable still-render path with an arbitrary target size. Image, AVFoundation video, sandboxed WebKit and Metal wallpapers therefore share the same lock-image pipeline. Metal stills preserve creator-property values and render at the requested target dimensions instead of the old 640×360 preview size.
+
+LockScreenCompositionGeometry owns Fill/Fit/Stretch/Center math independently of AppKit drawing so it can be regression-tested. The generated image can apply Gaussian blur, dimming, saturation and vignette after the wallpaper is composed. The wallpaper's native Time & Date overlay can optionally be drawn into the final bitmap using the same positioning settings.
+
+The default source is the currently assigned wallpaper for each display, with a fallback wallpaper when no assignment exists. Auto-refresh is optional and debounced by 1.25 seconds to avoid repeatedly rendering large 4K/5K/6K images while a user changes several controls or reconnects monitors.

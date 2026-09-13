@@ -2,6 +2,14 @@
 
 ## 0.4.0 - Creator Studio
 
+- Added Lock Screen Companion with per-display native-resolution snapshot generation.
+- Lock compositions support Fill/Fit/Stretch/Center, blur, dimming, saturation and vignette.
+- Lock Screen Companion can reuse each wallpaper's native Time & Date overlay and active per-display assignments.
+- Optional auto-refresh is debounced after wallpaper/display changes.
+- Added Wallpaper and Screen Saver System Settings handoff plus generated-file reveal.
+- Extended PreviewGenerator so image/video/WebGL/Metal wallpapers can render stills at arbitrary native pixel sizes instead of only 640×360 library previews.
+- Added Lock Screen geometry/settings regression tests and a macOS UI screenshot.
+
 - Added an in-app Creator Studio for turning Canva image/video exports into LumaWall wallpapers without JSON editing or Terminal.
 - Supports PNG, JPEG, HEIC, TIFF, WebP, MP4, MOV and M4V source artwork.
 - Creator metadata includes title, author/studio, description, category and tags.

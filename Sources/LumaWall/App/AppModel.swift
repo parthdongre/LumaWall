@@ -41,6 +41,9 @@ final class AppModel: ObservableObject {
   @Published var creatorDraft = CreatorWallpaperDraft()
   @Published var creatorAssetSummary: CreatorAssetSummary?
   @Published var creatorIsCreating = false
+  @Published var lockScreenSettings = LockScreenCompanionSettings.defaultComposition
+  @Published private(set) var lockScreenSnapshots: [LockScreenSnapshot] = []
+  @Published private(set) var lockScreenIsGenerating = false
 
   let engine = WallpaperEngine()
   let governor = PerformanceGovernor()
@@ -50,10 +53,12 @@ final class AppModel: ObservableObject {
   let updater = UpdateService()
   let power = PowerSourceMonitor()
   let quarantine = CrashQuarantineService()
+  let lockScreen = LockScreenSnapshotService()
   let library: WallpaperLibrary
 
   private var cancellables = Set<AnyCancellable>()
   private var previewGenerationInFlight = Set<UUID>()
+  private var lockScreenRefreshTask: Task<Void, Never>?
   private let defaults = UserDefaults.standard
 
   private enum Keys {
@@ -83,6 +88,7 @@ final class AppModel: ObservableObject {
     static let batteryProfile = "performance.batteryProfile"
     static let lowPowerProfile = "performance.lowPowerProfile"
     static let creatorAuthor = "creator.defaultAuthor"
+    static let lockScreenSettings = "lockScreen.companionSettings"
   }
 
   init() {
@@ -93,6 +99,12 @@ final class AppModel: ObservableObject {
     wallpapers = library.loadAll()
     selectedWallpaperID = wallpapers.first?.id
     creatorDraft.author = defaults.string(forKey: Keys.creatorAuthor) ?? ""
+    lockScreenSettings =
+      Self.loadLockScreenSettings(from: defaults)
+      ?? .defaultComposition
+    if lockScreenSettings.fallbackWallpaperID == nil {
+      lockScreenSettings.fallbackWallpaperID = selectedWallpaperID
+    }
     showOnboarding = !defaults.bool(forKey: Keys.onboardingCompleted)
 
     favoriteWallpaperIDs = Set(
@@ -271,6 +283,8 @@ final class AppModel: ObservableObject {
         if self.qualityPreset == .automatic {
           self.applyHardwareRecommendation()
         }
+
+        self.scheduleLockScreenRefresh()
       }
     }
 
@@ -530,6 +544,8 @@ final class AppModel: ObservableObject {
   }
 
   func shutdown() {
+    lockScreenRefreshTask?.cancel()
+    lockScreenRefreshTask = nil
     quarantine.markCleanShutdown()
     engine.stopAll()
     governor.stop()
@@ -768,6 +784,7 @@ final class AppModel: ObservableObject {
         displayID == nil
         ? "Applied \(wallpaper.name) to all displays"
         : "Applied \(wallpaper.name)"
+      scheduleLockScreenRefresh()
     } catch {
       show(error)
     }
@@ -908,6 +925,7 @@ final class AppModel: ObservableObject {
     timeDateOverlaySettings[wallpaperID] = settings
     saveTimeDateSettings()
     engine.setTimeDateOverlay(settings, for: wallpaperID)
+    scheduleLockScreenRefresh()
   }
 
   func applyTimeDatePreset(
@@ -1103,6 +1121,45 @@ final class AppModel: ObservableObject {
     }
   }
 
+  func updateLockScreenSettings(
+    _ settings: LockScreenCompanionSettings
+  ) {
+    lockScreenSettings = settings
+    saveLockScreenSettings()
+    scheduleLockScreenRefresh()
+  }
+
+  func generateLockScreenSnapshots() {
+    guard !lockScreenIsGenerating else { return }
+
+    lockScreenRefreshTask?.cancel()
+    lockScreenRefreshTask = nil
+
+    Task { @MainActor [weak self] in
+      await self?.generateLockScreenSnapshotsNow(silent: false)
+    }
+  }
+
+  func lockScreenSnapshot(
+    for displayID: CGDirectDisplayID
+  ) -> LockScreenSnapshot? {
+    lockScreenSnapshots.first {
+      $0.displayID == displayID
+    }
+  }
+
+  func revealLockScreenSnapshots() {
+    lockScreen.revealSnapshotFolder()
+  }
+
+  func openWallpaperSettings() {
+    lockScreen.openWallpaperSettings()
+  }
+
+  func openScreenSaverSettings() {
+    lockScreen.openScreenSaverSettings()
+  }
+
   func openLibraryFolder() {
     NSWorkspace.shared.open(library.libraryRoot)
   }
@@ -1196,6 +1253,114 @@ final class AppModel: ObservableObject {
       $0[String($1.key)] = $1.value.uuidString
     }
     defaults.set(dictionary, forKey: "displayAssignments")
+  }
+
+  private func scheduleLockScreenRefresh() {
+    guard lockScreenSettings.autoRefresh else { return }
+
+    lockScreenRefreshTask?.cancel()
+
+    lockScreenRefreshTask = Task { @MainActor [weak self] in
+      do {
+        try await Task.sleep(nanoseconds: 1_250_000_000)
+      } catch {
+        return
+      }
+
+      guard !Task.isCancelled else { return }
+      await self?.generateLockScreenSnapshotsNow(silent: true)
+    }
+  }
+
+  private func generateLockScreenSnapshotsNow(
+    silent: Bool
+  ) async {
+    guard !lockScreenIsGenerating else { return }
+
+    lockScreenIsGenerating = true
+    defer { lockScreenIsGenerating = false }
+
+    var generated: [LockScreenSnapshot] = []
+    var failures: [String] = []
+
+    for display in displays {
+      guard let wallpaper = lockScreenWallpaper(for: display) else {
+        failures.append(display.name)
+        continue
+      }
+
+      do {
+        let overlay =
+          lockScreenSettings.includeWallpaperTimeDate
+          ? timeDateSettings(for: wallpaper.id)
+          : nil
+
+        let snapshot = try await lockScreen.generate(
+          wallpaper: wallpaper,
+          display: display,
+          settings: lockScreenSettings,
+          timeDateSettings: overlay,
+          propertyValues: propertyValues[wallpaper.id] ?? [:]
+        )
+
+        generated.append(snapshot)
+      } catch {
+        failures.append("\(display.name): \(error.localizedDescription)")
+      }
+    }
+
+    lockScreenSnapshots = generated
+
+    guard !silent else { return }
+
+    if generated.isEmpty {
+      lastError =
+        failures.isEmpty
+        ? LockScreenCompanionError.noWallpaper.localizedDescription
+        : failures.joined(separator: "\n")
+      statusMessage = "Could not generate lock-screen snapshots"
+    } else if failures.isEmpty {
+      statusMessage =
+        "Generated native-resolution lock images for \(generated.count) display(s)"
+    } else {
+      statusMessage =
+        "Generated \(generated.count) lock image(s); some displays failed"
+      lastError = failures.joined(separator: "\n")
+    }
+  }
+
+  private func lockScreenWallpaper(
+    for display: DisplayDescriptor
+  ) -> Wallpaper? {
+    if
+      lockScreenSettings.useActiveWallpaperPerDisplay,
+      let activeID = engine.assignmentSnapshot[display.id],
+      let active = wallpapers.first(where: { $0.id == activeID })
+    {
+      return active
+    }
+
+    if
+      let fallbackID = lockScreenSettings.fallbackWallpaperID,
+      let fallback = wallpapers.first(where: { $0.id == fallbackID })
+    {
+      return fallback
+    }
+
+    if
+      let selectedWallpaperID,
+      let selected = wallpapers.first(where: { $0.id == selectedWallpaperID })
+    {
+      return selected
+    }
+
+    return wallpapers.first
+  }
+
+  private func saveLockScreenSettings() {
+    if let data = try? JSONEncoder().encode(lockScreenSettings) {
+      defaults.set(data, forKey: Keys.lockScreenSettings)
+    }
   }
 
   private func savePropertyValues() {
@@ -1346,6 +1511,19 @@ final class AppModel: ObservableObject {
         result[id] = element.value
       }
     }
+  }
+
+  private static func loadLockScreenSettings(
+    from defaults: UserDefaults
+  ) -> LockScreenCompanionSettings? {
+    guard let data = defaults.data(forKey: Keys.lockScreenSettings) else {
+      return nil
+    }
+
+    return try? JSONDecoder().decode(
+      LockScreenCompanionSettings.self,
+      from: data
+    )
   }
 
   private static func loadPowerProfile(
