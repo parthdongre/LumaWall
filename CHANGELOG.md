@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Added native drag-and-drop importing across the Library with a clear drop-target treatment.
+- Added a unified Add menu for normal wallpaper imports, Wallpaper Engine project imports, and Creator Studio.
+- Added batch import handling so Finder drops and multi-select imports use the same library path.
+- Added `make doctor` to validate macOS, full Xcode selection, Swift, the macOS SDK, and the Metal compiler before build/run/package commands.
+- Improved the local Metal/toolchain troubleshooting path so Command Line Tools misconfiguration fails early with an actionable fix.
+
+
 ## 0.4.0 - Creator Studio
 
 - Added safe live previews to Library cards with a hover delay, one renderer at a time, 30 FPS cap and reduced render scale.
