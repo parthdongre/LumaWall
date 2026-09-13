@@ -1,4 +1,5 @@
 import Testing
+@testable import LumaWall
 
 @Test @MainActor
 func bundledAuroraIsDiscoverable() {
