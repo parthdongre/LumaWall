@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LibraryOverviewView: View {
   @EnvironmentObject private var model: AppModel
+  @State private var isDropTargeted = false
   let scope: LibraryScope
   @Binding var selection: SidebarDestination?
 
@@ -34,6 +35,33 @@ struct LibraryOverviewView: View {
     }
     .navigationTitle(scope.displayName)
     .searchable(text: $model.searchText, prompt: "Search wallpapers or creators")
+    .dropDestination(for: URL.self) { urls, _ in
+      let fileURLs = urls.filter(\.isFileURL)
+      guard !fileURLs.isEmpty else { return false }
+      model.importWallpapers(from: fileURLs)
+      return true
+    } isTargeted: { targeted in
+      isDropTargeted = targeted
+    }
+    .overlay {
+      if isDropTargeted {
+        RoundedRectangle(cornerRadius: 22)
+          .strokeBorder(.tint, style: StrokeStyle(lineWidth: 3, dash: [10, 8]))
+          .background(
+            RoundedRectangle(cornerRadius: 22)
+              .fill(.tint.opacity(0.08))
+          )
+          .padding(12)
+          .overlay {
+            Label("Drop to import", systemImage: "square.and.arrow.down")
+              .font(.title3.weight(.semibold))
+              .padding(.horizontal, 18)
+              .padding(.vertical, 10)
+              .background(.regularMaterial, in: Capsule())
+          }
+          .allowsHitTesting(false)
+      }
+    }
     .toolbar {
       ToolbarItemGroup {
         Menu {
@@ -68,9 +96,7 @@ struct LibraryOverviewView: View {
           Label("Types", systemImage: "line.3.horizontal.decrease.circle")
         }
 
-        Button(action: model.importWallpaper) {
-          Label("Import", systemImage: "plus")
-        }
+        WallpaperImportMenu()
       }
     }
   }

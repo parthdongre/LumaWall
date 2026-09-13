@@ -811,6 +811,12 @@ final class AppModel: ObservableObject {
     }
   }
 
+  func importWallpapers(from urls: [URL]) {
+    for url in urls where url.isFileURL {
+      importWallpaper(from: url)
+    }
+  }
+
   func importWallpaper() {
     let panel = NSOpenPanel()
     panel.canChooseDirectories = true

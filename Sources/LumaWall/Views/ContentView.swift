@@ -49,9 +49,7 @@ struct ContentView: View {
       }
       .navigationTitle("LumaWall")
       .toolbar {
-        Button(action: model.importWallpaper) {
-          Label("Import", systemImage: "plus")
-        }
+        WallpaperImportMenu()
       }
     } detail: {
       switch model.sidebarSelection {
