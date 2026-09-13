@@ -81,3 +81,8 @@ The source has been Swift parser-validated in the development environment. Apple
 ## macOS CI / Swift 6 compatibility
 
 The macOS CI build is treated as the source of truth for Apple-framework type checking. Swift 6 marks AppKit/WebKit UI APIs as main-actor isolated, while `Timer` callbacks are sendable/nonisolated closures. Timer callbacks therefore enter `Task { @MainActor in ... }` before touching UI-owned state, and `WebSecurityPolicy` is main-actor isolated because it constructs and mutates WebKit objects. We keep these explicit actor boundaries rather than disabling strict concurrency checking.
+
+
+## Command Line Tools compatibility
+
+SwiftPM treats processed `.metal` resources as build-time Metal sources and invokes the standalone `metal` compiler. Many Macs with only Apple Command Line Tools do not include that compiler. LumaWall's Metal renderer already compiles creator shader source at runtime with `MTLDevice.makeLibrary(source:options:)`, so the bundled `Resources` directory is copied verbatim instead of processed. This preserves shader examples while allowing `swift run LumaWall` without requiring the full Xcode app solely for resource compilation.

@@ -11,7 +11,7 @@ let package = Package(
         .executableTarget(
             name: "LumaWall",
             path: "Sources/LumaWall",
-            resources: [.process("Resources")]
+            resources: [.copy("Resources")]
         ),
         .testTarget(
             name: "LumaWallTests",
