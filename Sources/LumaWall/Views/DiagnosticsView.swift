@@ -132,10 +132,32 @@ struct DiagnosticsView: View {
                   }
 
                   Text(
-                    "\(snapshot.diagnostics.pixelWidth) × \(snapshot.diagnostics.pixelHeight) • \(snapshot.diagnostics.preferredFPS) FPS • \(Int(snapshot.diagnostics.renderScale * 100))%"
+                    "\(snapshot.diagnostics.pixelWidth) × \(snapshot.diagnostics.pixelHeight) • target \(snapshot.diagnostics.preferredFPS) FPS • \(Int(snapshot.diagnostics.renderScale * 100))%"
                   )
                   .font(.caption.monospacedDigit())
                   .foregroundStyle(.secondary)
+
+                  if let actual = snapshot.diagnostics.actualFPS {
+                    HStack(spacing: 10) {
+                      Text("actual \(String(format: "%.1f", actual)) FPS")
+
+                      if let frame = snapshot.diagnostics.averageFrameTimeMS {
+                        Text("\(String(format: "%.2f", frame)) ms")
+                      }
+
+                      if let dropped = snapshot.diagnostics.droppedFrameRatio {
+                        Text("drop \(String(format: "%.1f", dropped * 100))%")
+                      }
+
+                      Text(snapshot.diagnostics.loadClass.displayName)
+                    }
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(
+                      snapshot.diagnostics.loadClass == .overloaded
+                      ? Color.orange
+                      : Color.secondary
+                    )
+                  }
 
                   if let rate = snapshot.diagnostics.playbackRate {
                     Text(
@@ -187,6 +209,14 @@ struct DiagnosticsView: View {
             diagnosticRow(
               "Adaptive quality",
               model.governor.adaptiveQualityEnabled ? "Enabled" : "Disabled"
+            )
+            diagnosticRow(
+              "Workload adaptation",
+              model.governor.experimentalLoadAdaptationEnabled ? "Enabled" : "Disabled"
+            )
+            diagnosticRow(
+              "Measured pressure",
+              String(describing: model.governor.loadPressure).capitalized
             )
           }
         }

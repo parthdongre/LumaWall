@@ -239,6 +239,24 @@ final class AppModel: ObservableObject {
     automation.onWallpaperRequested = { [weak self] id in
       self?.applyWallpaper(id: id, to: nil)
     }
+    automation.contextProvider = { [weak self] in
+      guard let self else { return nil }
+
+      let isDark =
+        NSApp.effectiveAppearance.bestMatch(
+          from: [.darkAqua, .aqua]
+        ) == .darkAqua
+
+      return AutomationContext(
+        date: Date(),
+        batteryPercent: self.power.snapshot.percent,
+        isCharging: self.power.snapshot.isCharging,
+        isLowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
+        displayCount: self.displays.count,
+        externalDisplayConnected: self.displays.contains { !$0.isBuiltIn },
+        isDarkMode: isDark
+      )
+    }
 
     governor.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
@@ -1067,6 +1085,29 @@ final class AppModel: ObservableObject {
   func enableSafeModeForNextLaunch() {
     defaults.set(true, forKey: Keys.safeModeNextLaunch)
     statusMessage = "Safe Mode will be used on the next launch"
+  }
+
+  func addSmartRuleForSelected(
+    name: String,
+    condition: SmartRuleCondition,
+    priority: Int = 0
+  ) {
+    guard let wallpaperID = selectedWallpaperID else { return }
+
+    automation.addSmartRule(
+      SmartWallpaperRule(
+        name: name,
+        wallpaperID: wallpaperID,
+        conditions: [condition],
+        priority: priority
+      )
+    )
+
+    statusMessage = "Added smart rule: \(name)"
+  }
+
+  func removeSmartRule(_ id: UUID) {
+    automation.removeSmartRule(id)
   }
 
   func createPlaylistFromAll() {

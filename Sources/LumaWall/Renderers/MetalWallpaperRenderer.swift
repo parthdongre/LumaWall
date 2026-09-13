@@ -77,6 +77,9 @@ final class MetalWallpaperRenderer:
   private var edrEnabled =
     false
 
+  private var frameMeter =
+    RendererFrameMeter()
+
   var view: NSView {
     metalView
   }
@@ -84,7 +87,13 @@ final class MetalWallpaperRenderer:
   var diagnostics:
     RendererDiagnostics
   {
-    RendererDiagnostics(
+    let stats =
+      frameMeter.statistics(
+        targetFPS:
+          preferredFPS
+      )
+
+    return RendererDiagnostics(
       rendererName:
         edrEnabled
         ? "Metal / EDR"
@@ -106,7 +115,16 @@ final class MetalWallpaperRenderer:
             * renderScale
         ),
       playbackRate: nil,
-      muted: nil
+      muted: nil,
+      actualFPS:
+        stats?.actualFPS,
+      averageFrameTimeMS:
+        stats?.averageFrameTimeMS,
+      droppedFrameRatio:
+        stats?.droppedFrameRatio,
+      loadClass:
+        stats?.loadClass
+        ?? .unknown
     )
   }
 
@@ -279,6 +297,8 @@ final class MetalWallpaperRenderer:
 
     startTime =
       CACurrentMediaTime()
+
+    frameMeter.reset()
   }
 
   func play() {
@@ -399,6 +419,10 @@ final class MetalWallpaperRenderer:
   func draw(
     in view: MTKView
   ) {
+    frameMeter.recordFrame(
+      at: CACurrentMediaTime()
+    )
+
     guard
       let pipeline,
       let descriptor =

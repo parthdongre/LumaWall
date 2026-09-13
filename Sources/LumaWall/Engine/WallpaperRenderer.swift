@@ -8,6 +8,10 @@ struct RendererDiagnostics: Hashable, Sendable {
   var pixelHeight: Int
   var playbackRate: Double?
   var muted: Bool?
+  var actualFPS: Double? = nil
+  var averageFrameTimeMS: Double? = nil
+  var droppedFrameRatio: Double? = nil
+  var loadClass: RendererLoadClass = .unknown
 }
 
 @MainActor

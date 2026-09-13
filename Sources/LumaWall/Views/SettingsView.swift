@@ -301,6 +301,21 @@ struct SettingsView: View {
         )
 
         Toggle(
+          "Experimental workload-aware adaptation",
+          isOn: Binding(
+            get: { model.governor.experimentalLoadAdaptationEnabled },
+            set: { model.setExperimentalAdaptiveRenderingEnabled($0) }
+          )
+        )
+
+        if model.governor.experimentalLoadAdaptationEnabled {
+          LabeledContent(
+            "Measured renderer pressure",
+            value: String(describing: model.governor.loadPressure).capitalized
+          )
+        }
+
+        Toggle(
           "Pause for fullscreen apps",
           isOn: Binding(
             get: { model.governor.pauseForFullscreen },

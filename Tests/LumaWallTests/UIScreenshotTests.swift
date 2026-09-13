@@ -151,6 +151,31 @@ func captureMacOSUIScreenshots() async throws {
     to: output.appendingPathComponent("10-discover.png")
   )
 
+  if model.selectedWallpaperID != nil {
+    model.addSmartRuleForSelected(
+      name: "Battery Saver",
+      condition: .batteryBelow(30),
+      priority: 80
+    )
+    model.addSmartRuleForSelected(
+      name: "Night",
+      condition: .timeRange(
+        startMinutes: 22 * 60,
+        endMinutes: 6 * 60
+      ),
+      priority: 20
+    )
+  }
+
+  model.sidebarSelection = .automations
+  try capture(
+    ContentView()
+      .environmentObject(model),
+    size: NSSize(width: 1200, height: 860),
+    title: "LumaWall",
+    to: output.appendingPathComponent("11-smart-automation.png")
+  )
+
   model.shutdown()
 }
 

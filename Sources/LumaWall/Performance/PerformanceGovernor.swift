@@ -26,10 +26,13 @@ final class PerformanceGovernor: ObservableObject {
   @Published private(set) var preferredFPS = 60
   @Published private(set) var preferredRenderScale = 1.0
   @Published private(set) var maximumResolutionEnabled = true
+  @Published private(set) var experimentalLoadAdaptationEnabled = false
+  @Published private(set) var loadPressure: AdaptiveLoadPressure = .normal
 
   private var timer: Timer?
   private var lastPolicy: PerformancePolicy?
   private var lastFullscreenPauseSet = Set<CGDirectDisplayID>()
+  private var loadController = AdaptiveLoadController()
   private let monitor = FullscreenMonitor()
 
   func start() {
@@ -70,6 +73,51 @@ final class PerformanceGovernor: ObservableObject {
     adaptiveQualityEnabled = enabled
     evaluate()
   }
+  func setExperimentalLoadAdaptationEnabled(_ enabled: Bool) {
+    experimentalLoadAdaptationEnabled = enabled
+
+    if !enabled {
+      loadController.reset()
+      loadPressure = .normal
+    }
+
+    evaluate()
+  }
+
+  func reportRendererDiagnostics(
+    _ diagnostics: [RendererDiagnostics]
+  ) {
+    guard experimentalLoadAdaptationEnabled else { return }
+
+    let measured = diagnostics.compactMap { diagnostic -> (Double, Int)? in
+      guard
+        let actual = diagnostic.actualFPS,
+        diagnostic.preferredFPS > 0
+      else {
+        return nil
+      }
+
+      return (actual, diagnostic.preferredFPS)
+    }
+
+    guard
+      let worst = measured.min(by: {
+        ($0.0 / Double($0.1))
+          < ($1.0 / Double($1.1))
+      })
+    else {
+      return
+    }
+
+    if let changed = loadController.ingest(
+      actualFPS: worst.0,
+      targetFPS: worst.1
+    ) {
+      loadPressure = changed
+      evaluate()
+    }
+  }
+
 
   func setUserTargets(fps: Int, renderScale: Double) {
     preferredFPS = max(15, min(120, fps))
@@ -123,9 +171,29 @@ final class PerformanceGovernor: ObservableObject {
         shouldPause: false
       )
     } else {
+      let loadFPS: Int
+      let loadScale: Double
+
+      if experimentalLoadAdaptationEnabled {
+        switch loadPressure {
+        case .normal:
+          loadFPS = preferredFPS
+          loadScale = preferredRenderScale
+        case .constrained:
+          loadFPS = min(preferredFPS, 60)
+          loadScale = min(preferredRenderScale, 0.85)
+        case .overloaded:
+          loadFPS = min(preferredFPS, 30)
+          loadScale = min(preferredRenderScale, 0.65)
+        }
+      } else {
+        loadFPS = preferredFPS
+        loadScale = preferredRenderScale
+      }
+
       policy = .init(
-        targetFPS: preferredFPS,
-        renderScale: maximumResolutionEnabled ? 1.0 : preferredRenderScale,
+        targetFPS: loadFPS,
+        renderScale: maximumResolutionEnabled ? 1.0 : loadScale,
         shouldPause: false
       )
     }

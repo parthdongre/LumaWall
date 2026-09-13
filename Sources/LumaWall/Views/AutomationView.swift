@@ -37,6 +37,128 @@ struct AutomationView: View {
         }
       }
 
+      Section("Smart Rules") {
+        if model.automation.smartRules.isEmpty {
+          Text(
+            "Rules can switch wallpapers when battery, charging, display, appearance or time conditions change."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        } else {
+          ForEach(model.automation.smartRules) { rule in
+            HStack(alignment: .top) {
+              Toggle(
+                "",
+                isOn: Binding(
+                  get: { rule.enabled },
+                  set: {
+                    model.automation.setSmartRuleEnabled(
+                      rule.id,
+                      enabled: $0
+                    )
+                  }
+                )
+              )
+              .labelsHidden()
+
+              VStack(alignment: .leading, spacing: 3) {
+                Text(rule.name)
+                  .font(.headline)
+
+                Text(
+                  model.wallpapers.first(where: { $0.id == rule.wallpaperID })?.name
+                    ?? "Missing wallpaper"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Text(
+                  rule.conditions
+                    .map(\.displayName)
+                    .joined(separator: " + ")
+                )
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+              }
+
+              Spacer()
+
+              Text("P\(rule.priority)")
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
+
+              Button {
+                model.removeSmartRule(rule.id)
+              } label: {
+                Image(systemName: "trash")
+              }
+              .buttonStyle(.plain)
+              .help("Delete rule")
+            }
+          }
+        }
+
+        if model.selectedWallpaperID != nil {
+          Menu {
+            Button("Battery below 30%") {
+              model.addSmartRuleForSelected(
+                name: "Battery Saver",
+                condition: .batteryBelow(30),
+                priority: 80
+              )
+            }
+
+            Button("When charging") {
+              model.addSmartRuleForSelected(
+                name: "Charging",
+                condition: .charging(true),
+                priority: 40
+              )
+            }
+
+            Button("External display connected") {
+              model.addSmartRuleForSelected(
+                name: "External Display",
+                condition: .externalDisplayConnected(true),
+                priority: 60
+              )
+            }
+
+            Button("Low Power Mode") {
+              model.addSmartRuleForSelected(
+                name: "Low Power",
+                condition: .lowPowerMode(true),
+                priority: 100
+              )
+            }
+
+            Button("Dark Mode") {
+              model.addSmartRuleForSelected(
+                name: "Dark Mode",
+                condition: .darkMode(true),
+                priority: 30
+              )
+            }
+
+            Button("Night — 10 PM to 6 AM") {
+              model.addSmartRuleForSelected(
+                name: "Night",
+                condition: .timeRange(
+                  startMinutes: 22 * 60,
+                  endMinutes: 6 * 60
+                ),
+                priority: 20
+              )
+            }
+          } label: {
+            Label(
+              "Add Rule for Selected Wallpaper",
+              systemImage: "plus.circle"
+            )
+          }
+        }
+      }
+
       Section("Solar location") {
         HStack {
           TextField(

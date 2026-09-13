@@ -242,3 +242,18 @@ Discover is deliberately not populated with third-party or random wallpapers. It
 Remote catalog and package URLs must use HTTPS. A listing may provide a SHA-256 digest; when present, the downloaded .wall archive is hashed in 1 MB chunks before import and rejected on mismatch. The archive then passes through the existing .wall traversal/path validation before being copied into LumaWall-owned storage.
 
 The service uses URLSession download tasks so large packages are written to a temporary file rather than held in memory, with a 1 GB catalog-install ceiling. The UI exposes search, category filtering, featured/type badges and explicit install progress. Local JSON catalogs can be opened for development without requiring a server.
+
+
+## v0.4.0 renderer telemetry and adaptive workload research
+
+Metal renderers now keep a bounded rolling frame-time history. Diagnostics exposes measured FPS, average frame time, estimated dropped-frame ratio and a simple Light/Moderate/Heavy/Overloaded classification without introducing a separate profiling process.
+
+An experimental workload controller consumes measured FPS versus the renderer target. It uses hysteresis: several weak samples are required before constraining quality, severe overload escalates faster, and multiple healthy samples are required before recovering. The feature is opt-in; the existing battery/thermal governor remains the default behavior. Maximum Resolution still wins when enabled, so workload adaptation reduces FPS before pixel scale.
+
+## v0.4.0 Smart Rules
+
+Automation now supports state-based wallpaper rules in addition to playlists and clock/sun schedules. Conditions include battery above/below, charging, Low Power Mode, external-display presence, dark/light appearance, weekdays and time ranges that can cross midnight.
+
+Rules are AND-composed, ranked by integer priority and evaluated from a small context supplied by AppModel. Only the highest-priority matching rule is active, and its wallpaper is requested only when that active rule changes. This avoids multiple matching rules fighting on every polling interval.
+
+Schedule, playlist and smart-rule timers use the common main run-loop mode so Dock/menu/window tracking cannot freeze automation state.

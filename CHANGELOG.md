@@ -2,6 +2,12 @@
 
 ## 0.4.0 - Creator Studio
 
+- Added real Metal renderer telemetry: measured FPS, average frame time, estimated drop ratio and load class.
+- Added an opt-in workload-aware adaptive renderer controller with hysteresis so transient frame dips do not immediately reduce quality.
+- Added Smart Rules for battery thresholds, charging state, Low Power Mode, external displays, dark/light mode, weekdays and overnight time ranges.
+- Smart Rules choose one highest-priority match and fire only when the active match changes, preventing competing rules from repeatedly switching wallpapers.
+- Automation and playlist timers now run in the common run-loop so window/menu tracking does not freeze scheduling.
+
 - Added Discover as a curated catalog that is intentionally empty until the user supplies a catalog they control.
 - Remote catalogs and wallpaper downloads require HTTPS.
 - Discover supports optional per-package SHA-256 verification before handing the package to LumaWall's existing traversal-safe .wall importer.
