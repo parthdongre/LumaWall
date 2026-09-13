@@ -8,9 +8,9 @@ LumaWall uses Swift/AppKit for desktop-window behavior and SwiftUI for controls.
 
 `WallpaperEngine` keeps one controller per `CGDirectDisplayID`. Applying a wallpaper only replaces the requested displays rather than stopping every renderer. Assignments are persisted in `UserDefaults` and restored at launch.
 
-## 2. SwiftData library
+## 2. Local wallpaper library
 
-Imported assets are copied under `~/Library/Application Support/LumaWall/Wallpapers/<UUID>/`. `StoredWallpaper` persists metadata through SwiftData. We do not keep fragile references to arbitrary source files that can be moved or deleted.
+Imported assets are copied under `~/Library/Application Support/LumaWall/Wallpapers/<UUID>/`. `StoredWallpaper` persists metadata in a Codable JSON index. We do not keep fragile references to arbitrary source files that can be moved or deleted.
 
 ## 3. Fullscreen/game auto-pause
 
@@ -69,7 +69,7 @@ Web wallpapers use a non-persistent WebKit data store. Remote HTTP/HTTPS subreso
 - **AVFoundation** over browser video: better native decode/looping and lower overhead.
 - **WKWebView** over bundling Chromium: WebGL/JS support with much smaller distribution and native sandbox primitives.
 - **MetalKit** over OpenGL: current native GPU API and better Apple Silicon fit.
-- **SwiftData** over a hand-rolled JSON library: structured persistence with migration potential.
+- **Codable JSON index** over SwiftData: it avoids compiler-plugin requirements on Command Line Tools-only Macs while keeping the local library portable and easy to inspect.
 - **ScreenCaptureKit** over virtual audio devices: Apple-supported system capture without asking users to install a kernel/driver-style component.
 - **ServiceManagement** over legacy login items: current public launch-at-login API.
 
@@ -96,3 +96,10 @@ A Command Line Tools-only Swift toolchain may provide the macOS SDK frameworks w
 ## Bundled resource lookup after CLT compatibility change
 
 After changing SwiftPM resources from `.process("Resources")` to `.copy("Resources")`, the bundle keeps the top-level `Resources` directory. Built-in wallpaper lookup now checks both processed-resource and copied-resource layouts, and CI includes a regression test that verifies the bundled Aurora wallpaper is discoverable.
+
+
+## Built-in wallpaper collection
+
+Built-ins are now ordinary `.wall` package directories under `Resources/BuiltInWallpapers`, discovered at runtime from their manifests rather than hardcoded one-by-one in Swift. The first collection adds ten native Metal designs and six HTML/Canvas/WebGL designs alongside Aurora. This makes future additions data-driven: a new bundled wallpaper normally requires only a package directory, manifest, and assets.
+
+Library cards generate missing previews lazily as they become visible. This avoids blocking launch to render every preview while still turning the collection into a visual gallery during normal browsing.

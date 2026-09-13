@@ -26,11 +26,9 @@ final class WallpaperLibrary {
       .compactMap { try? $0.makeWallpaper() }
       .filter { fileManager.fileExists(atPath: $0.entryURL.path) }
 
-    if let bundled = bundledAurora(),
-      !result.contains(where: { $0.name == bundled.name && $0.author == bundled.author })
-    {
-      result.insert(bundled, at: 0)
-    }
+    let bundled = bundledWallpapers()
+    let existingIDs = Set(result.map(\.id))
+    result.insert(contentsOf: bundled.filter { !existingIDs.contains($0.id) }, at: 0)
     return result
   }
 
@@ -179,6 +177,57 @@ final class WallpaperLibrary {
     case "html", "htm": return .web
     case "metal": return .metal
     default: throw WallpaperError.unsupportedFileType(url.pathExtension.lowercased())
+    }
+  }
+
+  private func bundledWallpapers() -> [Wallpaper] {
+    var wallpapers: [Wallpaper] = []
+    if let aurora = bundledAurora() {
+      wallpapers.append(aurora)
+    }
+
+    for root in builtInWallpaperRoots() {
+      guard
+        let packages = try? fileManager.contentsOfDirectory(
+          at: root,
+          includingPropertiesForKeys: [.isDirectoryKey],
+          options: [.skipsHiddenFiles]
+        )
+      else { continue }
+
+      for packageRoot in packages.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+        guard packageRoot.hasDirectoryPath else { continue }
+        let manifestURL = packageRoot.appendingPathComponent("wallpaper.json")
+        guard
+          let data = try? Data(contentsOf: manifestURL),
+          let manifest = try? JSONDecoder().decode(WallpaperManifest.self, from: data)
+        else { continue }
+
+        let id =
+          manifest.id.flatMap(UUID.init(uuidString:))
+          ?? UUID()
+        if let wallpaper = try? packageService.loadPackage(at: packageRoot, id: id) {
+          wallpapers.append(wallpaper)
+        }
+      }
+    }
+
+    var seen = Set<UUID>()
+    return wallpapers.filter { seen.insert($0.id).inserted }
+  }
+
+  private func builtInWallpaperRoots() -> [URL] {
+    let candidates: [URL?] = [
+      Bundle.module.resourceURL?
+        .appendingPathComponent("BuiltInWallpapers", isDirectory: true),
+      Bundle.module.resourceURL?
+        .appendingPathComponent("Resources", isDirectory: true)
+        .appendingPathComponent("BuiltInWallpapers", isDirectory: true),
+    ]
+    return candidates.compactMap { $0 }.filter {
+      var isDirectory: ObjCBool = false
+      return fileManager.fileExists(atPath: $0.path, isDirectory: &isDirectory)
+        && isDirectory.boolValue
     }
   }
 

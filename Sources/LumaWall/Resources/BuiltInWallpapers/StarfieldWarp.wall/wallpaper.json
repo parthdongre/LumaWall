@@ -1,0 +1,38 @@
+{
+  "formatVersion": 1,
+  "id": "10000000-0000-4000-8000-000000000002",
+  "name": "Starfield Warp",
+  "author": "LumaWall",
+  "type": "metal",
+  "entry": "assets/main.metal",
+  "permissions": [
+    "mouse",
+    "systemAudio"
+  ],
+  "properties": [
+    {
+      "id": "speed",
+      "name": "Warp Speed",
+      "kind": "slider",
+      "defaultValue": 1.2,
+      "minValue": 0.1,
+      "maxValue": 4,
+      "step": 0.05
+    },
+    {
+      "id": "density",
+      "name": "Star Density",
+      "kind": "slider",
+      "defaultValue": 1,
+      "minValue": 0.3,
+      "maxValue": 2.5,
+      "step": 0.05
+    },
+    {
+      "id": "accent",
+      "name": "Nebula Tint",
+      "kind": "color",
+      "defaultValue": "#7C4DFF"
+    }
+  ]
+}

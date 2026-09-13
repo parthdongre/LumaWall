@@ -1,0 +1,38 @@
+{
+  "formatVersion": 1,
+  "id": "10000000-0000-4000-8000-000000000014",
+  "name": "Matrix Cascade",
+  "author": "LumaWall",
+  "type": "web",
+  "entry": "assets/index.html",
+  "permissions": [
+    "mouse",
+    "systemAudio"
+  ],
+  "properties": [
+    {
+      "id": "speed",
+      "name": "Fall Speed",
+      "kind": "slider",
+      "defaultValue": 1,
+      "minValue": 0.2,
+      "maxValue": 3,
+      "step": 0.05
+    },
+    {
+      "id": "density",
+      "name": "Density",
+      "kind": "slider",
+      "defaultValue": 1,
+      "minValue": 0.4,
+      "maxValue": 2,
+      "step": 0.05
+    },
+    {
+      "id": "accent",
+      "name": "Glyph Color",
+      "kind": "color",
+      "defaultValue": "#39FF88"
+    }
+  ]
+}

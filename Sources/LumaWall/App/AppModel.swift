@@ -24,6 +24,7 @@ final class AppModel: ObservableObject {
   let launchAtLogin = LaunchAtLoginController()
   let library: WallpaperLibrary
   private var cancellables = Set<AnyCancellable>()
+  private var previewGenerationInFlight = Set<UUID>()
 
   init() {
     library = WallpaperLibrary()
@@ -49,6 +50,22 @@ final class AppModel: ObservableObject {
     ) { [weak self] _ in Task { @MainActor in self?.displays = DisplayManager.connectedDisplays() }
     }
     Task { @MainActor [weak self] in self?.restoreAssignments() }
+  }
+
+  func ensurePreview(for wallpaperID: UUID) async {
+    guard !previewGenerationInFlight.contains(wallpaperID),
+      let wallpaper = wallpapers.first(where: { $0.id == wallpaperID }),
+      wallpaper.thumbnailURL == nil
+        || !(wallpaper.thumbnailURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false)
+    else { return }
+
+    previewGenerationInFlight.insert(wallpaperID)
+    defer { previewGenerationInFlight.remove(wallpaperID) }
+
+    let updated = await library.generatePreviewIfNeeded(for: wallpaper)
+    if let index = wallpapers.firstIndex(where: { $0.id == wallpaperID }) {
+      wallpapers[index] = updated
+    }
   }
 
   func importWallpaper() {

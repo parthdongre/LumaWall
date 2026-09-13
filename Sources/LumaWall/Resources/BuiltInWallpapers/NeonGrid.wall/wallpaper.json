@@ -1,0 +1,38 @@
+{
+  "formatVersion": 1,
+  "id": "10000000-0000-4000-8000-000000000001",
+  "name": "Neon Grid",
+  "author": "LumaWall",
+  "type": "metal",
+  "entry": "assets/main.metal",
+  "permissions": [
+    "mouse",
+    "systemAudio"
+  ],
+  "properties": [
+    {
+      "id": "speed",
+      "name": "Speed",
+      "kind": "slider",
+      "defaultValue": 1,
+      "minValue": 0.1,
+      "maxValue": 3,
+      "step": 0.05
+    },
+    {
+      "id": "glow",
+      "name": "Glow",
+      "kind": "slider",
+      "defaultValue": 1,
+      "minValue": 0.2,
+      "maxValue": 2.5,
+      "step": 0.05
+    },
+    {
+      "id": "accent",
+      "name": "Accent",
+      "kind": "color",
+      "defaultValue": "#00E5FF"
+    }
+  ]
+}

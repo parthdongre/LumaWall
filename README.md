@@ -24,7 +24,7 @@ Implemented in the current source tree:
 - portable `.wall` ZIP packages with import/export
 - image/video/web preview generation
 - menu-bar controls
-- SwiftData-backed wallpaper library
+- Codable JSON-backed wallpaper library (works with Command Line Tools-only Swift installs)
 - launch-at-login helper via ServiceManagement
 - local web-wallpaper sandbox with explicit network permission
 
@@ -32,13 +32,13 @@ The community gallery / Workshop is intentionally not part of v0.2. The local pa
 
 ## Quick start
 
-Requirements: macOS 14+ and Xcode 16+.
+Requirements: macOS 14+. Full Xcode is optional for normal SwiftPM development; Apple Command Line Tools are sufficient for `swift run LumaWall`.
 
 1. Open the repository in Xcode as a Swift Package.
 2. Run the `LumaWall` executable target.
-3. Select the built-in **Aurora** Metal wallpaper and choose **Set Wallpaper**.
+3. Pick from the built-in wallpaper collection (Aurora plus Metal, WebGL, Canvas and audio-reactive designs) and choose **Set Wallpaper**.
 4. Enable system audio in Settings if you want audio-reactive data.
-5. Import `Examples/WebSpectrum.wall` to exercise WebGL, mouse interaction, FFT data and all four creator-control kinds.
+5. The built-in collection already exercises Metal, WebGL/Canvas, mouse interaction and FFT data; `Examples/WebSpectrum.wall` remains available as an importable creator example.
 
 ScreenCaptureKit requires the user's screen-recording/capture permission. Launch-at-login is intended for the signed app-bundle distribution build rather than an arbitrary command-line location. Apple recommends requesting screen-capture permission before capturing content.
 

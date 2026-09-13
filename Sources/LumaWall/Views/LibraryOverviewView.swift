@@ -15,6 +15,7 @@ struct LibraryOverviewView: View {
             VStack(alignment: .leading, spacing: 10) {
               WallpaperThumbnail(wallpaper: wallpaper)
                 .aspectRatio(16 / 9, contentMode: .fit)
+                .task { await model.ensurePreview(for: wallpaper.id) }
               Text(wallpaper.name)
                 .font(.headline)
               Text("\(wallpaper.type.rawValue.capitalized) • \(wallpaper.author)")

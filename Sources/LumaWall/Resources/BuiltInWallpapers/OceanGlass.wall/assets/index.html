@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+html,body,canvas{margin:0;width:100%;height:100%;overflow:hidden;background:#02030a}canvas{display:block}
+</style></head><body><canvas id="c"></canvas><script>
+const c=document.getElementById('c'), gl=c.getContext('webgl',{antialias:false,alpha:false});
+const vs='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+const fs=`precision highp float;
+uniform float t;uniform vec2 r;uniform vec2 m;uniform vec4 a;uniform float speed;uniform float intensity;
+uniform vec3 accent;
+void main(){vec2 uv=gl_FragCoord.xy/r;vec2 p=(uv-.5)*vec2(r.x/r.y,1.);float T=t*speed;float w=sin(p.x*9.+T)+sin((p.x+p.y)*7.-T*.8)+sin(p.y*12.+T*.45);float ca=pow(.5+.5*cos(w*1.7),10.)*intensity;float depth=smoothstep(-.6,.55,p.y);vec3 col=mix(vec3(.002,.025,.055),accent*.32,depth);col+=mix(accent,vec3(.8,1.,1.),.7)*ca*.55*(1.+a.w*.5);float sun=exp(-length(p-vec2((m.x-.5)*.6,.28+(m.y-.5)*.1))*3.);col+=vec3(.2,.45,.5)*sun*.12;gl_FragColor=vec4(col,1.);}`;
+function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);return s}
+const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
+const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+const pl=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(pl);gl.vertexAttribPointer(pl,2,gl.FLOAT,false,0,0);
+const U=n=>gl.getUniformLocation(pr,n);const ut=U('t'),ur=U('r'),um=U('m'),ua=U('a'),us=U('speed'),ui=U('intensity');
+let mouse=[.5,.5],audio={level:0,bass:0,mid:0,treble:0},props={speed:0.8,intensity:1,accent:'#16C7D9'};
+function hex(s){s=(s||'#ffffff').replace('#','');return [parseInt(s.slice(0,2),16)/255,parseInt(s.slice(2,4),16)/255,parseInt(s.slice(4,6),16)/255]}
+LumaWall.on('mouse',v=>mouse=[v.x,v.y]);LumaWall.on('audio',v=>audio=v||audio);LumaWall.on('properties',v=>Object.assign(props,v||{}));
+function resize(){const d=devicePixelRatio||1;c.width=innerWidth*d;c.height=innerHeight*d;gl.viewport(0,0,c.width,c.height)}addEventListener('resize',resize);resize();
+function draw(ms){const cc=hex(props.accent);gl.uniform1f(ut,ms*.001);gl.uniform2f(ur,c.width,c.height);gl.uniform2f(um,mouse[0],mouse[1]);gl.uniform4f(ua,audio.level||0,audio.bass||0,audio.mid||0,audio.treble||0);gl.uniform1f(us,+props.speed||1);gl.uniform1f(ui,+props.intensity||1);gl.uniform3f(U('accent'),cc[0],cc[1],cc[2]);gl.drawArrays(gl.TRIANGLES,0,3);requestAnimationFrame(draw)}requestAnimationFrame(draw);
+</script></body></html>

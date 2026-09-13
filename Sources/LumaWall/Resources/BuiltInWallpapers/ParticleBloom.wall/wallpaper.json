@@ -1,0 +1,38 @@
+{
+  "formatVersion": 1,
+  "id": "10000000-0000-4000-8000-000000000006",
+  "name": "Particle Bloom",
+  "author": "LumaWall",
+  "type": "metal",
+  "entry": "assets/main.metal",
+  "permissions": [
+    "mouse",
+    "systemAudio"
+  ],
+  "properties": [
+    {
+      "id": "speed",
+      "name": "Orbit Speed",
+      "kind": "slider",
+      "defaultValue": 1,
+      "minValue": 0.1,
+      "maxValue": 3,
+      "step": 0.05
+    },
+    {
+      "id": "amount",
+      "name": "Bloom",
+      "kind": "slider",
+      "defaultValue": 1,
+      "minValue": 0.2,
+      "maxValue": 2.2,
+      "step": 0.05
+    },
+    {
+      "id": "accent",
+      "name": "Petal Color",
+      "kind": "color",
+      "defaultValue": "#FF5EA8"
+    }
+  ]
+}

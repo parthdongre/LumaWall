@@ -1,0 +1,8 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body,canvas{margin:0;width:100%;height:100%;overflow:hidden;background:linear-gradient(#071512,#020706)}canvas{display:block}</style></head><body><canvas id="c"></canvas><script>
+const c=document.getElementById('c'),g=c.getContext('2d');let mouse={x:.5,y:.5},audio={level:0,mid:0},props={speed:.7,density:1,accent:'#FFE66D'},pts=[];
+LumaWall.on('mouse',v=>mouse=v);LumaWall.on('audio',v=>audio=v||audio);LumaWall.on('properties',v=>{Object.assign(props,v||{});seed()});
+function resize(){const d=devicePixelRatio||1;c.width=innerWidth*d;c.height=innerHeight*d;seed()}addEventListener('resize',resize);
+function seed(){const n=Math.max(24,Math.floor(70*(+props.density||1)));while(pts.length<n)pts.push({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*.0003,vy:(Math.random()-.5)*.0003,p:Math.random()*6.28});pts.length=n}
+function rgb(h){h=(h||'#FFE66D').replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
+resize();function draw(t){g.fillStyle='rgba(2,8,7,.22)';g.fillRect(0,0,c.width,c.height);const [r,gg,b]=rgb(props.accent),sp=+props.speed||1;for(const q of pts){let dx=mouse.x-q.x,dy=mouse.y-q.y,d=Math.hypot(dx,dy);if(d<.22){q.vx-=dx*.000012;q.vy-=dy*.000012}q.x=(q.x+q.vx*sp+1)%1;q.y=(q.y+q.vy*sp+1)%1;q.p+=.035*sp;const pulse=.35+.65*(.5+.5*Math.sin(q.p+t*.0015))*(1+(audio.mid||0));const X=q.x*c.width,Y=q.y*c.height,R=(3+8*pulse)*(devicePixelRatio||1);const gr=g.createRadialGradient(X,Y,0,X,Y,R);gr.addColorStop(0,`rgba(${r},${gg},${b},${Math.min(1,pulse)})`);gr.addColorStop(1,`rgba(${r},${gg},${b},0)`);g.fillStyle=gr;g.beginPath();g.arc(X,Y,R,0,6.283);g.fill()}requestAnimationFrame(draw)}requestAnimationFrame(draw);
+</script></body></html>
