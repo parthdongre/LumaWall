@@ -144,3 +144,18 @@ The app bundle registers the `.wall` document type, and AppKit's application del
 The first v0.3 packaging run exposed a macOS code-signing rule: arbitrary files or symlinks at the root of an `.app` bundle are considered unsealed contents. The SwiftPM resource-bundle compatibility symlink was therefore removed.
 
 Packaged builds now keep `LumaWall_LumaWall.bundle` exclusively under `Contents/Resources`, and `WallpaperLibrary` resolves that nested bundle explicitly when `Bundle.main` is an installed app. Development runs still use `Bundle.module`. This preserves Command Line Tools development while producing a standards-compliant signed app bundle.
+
+
+## App-only macOS user experience
+
+LumaWall is now treated explicitly as a macOS application rather than a CLI-assisted project. Shell scripts and SwiftPM commands remain developer/build infrastructure only; they are not part of the normal user journey.
+
+First launch is handled by a native SwiftUI onboarding sheet backed by `AppModel` state rather than `@State`, preserving compatibility with the lightweight Command Line Tools configuration used during development. The onboarding explains supported wallpaper technologies, performance presets, optional audio permissions, and recovery tools.
+
+Settings now exposes all operational controls through macOS UI tabs: General, Performance, Audio, Updates, Recovery and About. The previous user-facing Terminal Safe Mode instruction was removed; users can request Safe Mode for the next launch from the Recovery tab.
+
+## In-app update flow
+
+`UpdateService` checks the repository's GitHub Releases endpoint using `URLSession`. When a newer release exists, it selects the DMG first (PKG as fallback), downloads it to the user's Downloads directory with a collision-safe filename, and opens the installer using `NSWorkspace`.
+
+This is intentionally not a silent self-replacement updater yet. Opening a signed/notarized DMG or PKG keeps installation behavior aligned with standard macOS distribution while still allowing the entire update discovery/download workflow to happen inside LumaWall.

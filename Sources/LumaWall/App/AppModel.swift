@@ -24,12 +24,15 @@ final class AppModel: ObservableObject {
   @Published var restoreAssignmentsOnLaunch = true
   @Published private(set) var isSafeMode = false
   @Published var statusMessage: String?
+  @Published var showOnboarding = false
+  @Published var onboardingPage = 0
 
   let engine = WallpaperEngine()
   let governor = PerformanceGovernor()
   let audio = AudioReactiveController()
   let automation = WallpaperAutomationController()
   let launchAtLogin = LaunchAtLoginController()
+  let updater = UpdateService()
   let library: WallpaperLibrary
 
   private var cancellables = Set<AnyCancellable>()
@@ -49,6 +52,7 @@ final class AppModel: ObservableObject {
     static let pauseGames = "performance.pauseGames"
     static let restoreAssignments = "startup.restoreAssignments"
     static let safeModeNextLaunch = "startup.safeModeNextLaunch"
+    static let onboardingCompleted = "onboarding.completed"
   }
 
   init() {
@@ -56,6 +60,7 @@ final class AppModel: ObservableObject {
     wallpapers = library.loadAll()
     displays = DisplayManager.connectedDisplays()
     selectedWallpaperID = wallpapers.first?.id
+    showOnboarding = !defaults.bool(forKey: Keys.onboardingCompleted)
 
     favoriteWallpaperIDs = Set(
       defaults.stringArray(forKey: Keys.favorites)?.compactMap(UUID.init(uuidString:)) ?? [])
@@ -114,6 +119,8 @@ final class AppModel: ObservableObject {
     automation.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
     launchAtLogin.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
+      in: &cancellables)
+    updater.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
 
     NotificationCenter.default.addObserver(
@@ -319,6 +326,30 @@ final class AppModel: ObservableObject {
     if systemAudioEnabled {
       Task { await audio.stop() }
     }
+  }
+
+  func nextOnboardingPage() {
+    onboardingPage = min(3, onboardingPage + 1)
+  }
+
+  func previousOnboardingPage() {
+    onboardingPage = max(0, onboardingPage - 1)
+  }
+
+  func finishOnboarding() {
+    defaults.set(true, forKey: Keys.onboardingCompleted)
+    showOnboarding = false
+    onboardingPage = 0
+    statusMessage = "Welcome to LumaWall"
+  }
+
+  func reopenOnboarding() {
+    onboardingPage = 0
+    showOnboarding = true
+  }
+
+  func checkForUpdates() {
+    updater.checkForUpdates(currentVersion: AppVersion.version)
   }
 
   func importWallpaper() {

@@ -1,63 +1,77 @@
 # LumaWall
 
-LumaWall is a native macOS live-wallpaper engine inspired by Steam Wallpaper Engine. The project is designed around an extensible renderer boundary so image, video, HTML/JS/WebGL and native Metal wallpapers can share the same display, performance, interaction, audio and creator-property systems.
-
-## v0.3 feature set
-
-Implemented in the current source tree:
-
-- static image wallpapers
-- hardware-decoded looping video wallpapers via AVFoundation
-- HTML/CSS/JavaScript and WebGL wallpapers via WKWebView
-- runtime-compiled Metal fragment-shader wallpapers
-- permission-gated mouse interaction
-- ScreenCaptureKit system-audio capture
-- FFT analysis with level, bass, mids, treble and a 32-bin spectrum
-- per-display wallpaper assignments and assignment restoration
-- playlists
-- daily, one-date, sunrise and sunset schedule primitives
-- Low Power Mode + thermal-aware quality governor
-- fullscreen auto-pause heuristic and game-category auto-pause
-- 30 / 60 / 120 FPS controls
-- render-scale controls
-- creator slider, toggle, color and dropdown properties
-- portable `.wall` ZIP packages with import/export
-- image/video/web preview generation
-- menu-bar controls
-- Codable JSON-backed wallpaper library (works with Command Line Tools-only Swift installs)
-- launch-at-login helper via ServiceManagement
-- local web-wallpaper sandbox with explicit network permission
-
-Additional v0.3 product features include searchable/filterable library views, favorites, recents, persistent creator controls, quality presets, Safe Mode, diagnostics, keyboard/menu-bar workflows, and installable macOS package generation.
-
-The community gallery / Workshop remains a later milestone. The local package/security model is intentionally being stabilized before public third-party uploads are accepted.
+LumaWall is a **macOS-only native live-wallpaper app** inspired by Steam Wallpaper Engine. Normal users do not need Terminal, Swift, Xcode, or developer tools.
 
 ## Install
 
-Requirements: macOS 14+.
+Download the latest **LumaWall DMG** from GitHub Releases, open it, and drag **LumaWall.app** into **Applications**.
 
-For a normal user build, use the DMG or PKG produced by GitHub Actions. For a local install from source:
+After installation, everything is controlled from the app:
 
-```bash
-git clone https://github.com/parthdongre/LumaWall.git
-cd LumaWall
-make install
-```
+- wallpaper library
+- image / video / HTML / WebGL / Metal wallpapers
+- per-display assignments
+- favorites and recent wallpapers
+- search and filtering
+- playlists and schedules
+- creator sliders, colors, toggles and dropdowns
+- 30 / 60 / 120 FPS controls
+- quality presets and render scale
+- adaptive battery / thermal performance
+- fullscreen and game auto-pause
+- mouse interaction
+- audio-reactive wallpapers
+- system-audio permission controls
+- import / export of `.wall` packages
+- launch at login
+- software updates
+- Safe Mode
+- diagnostics and crash-report tools
+- menu-bar controls
 
-For development, full Xcode is optional; Apple Command Line Tools are sufficient for `swift run LumaWall`.
+The first launch includes an in-app welcome guide. No command-line setup is required.
 
-## Quick start
+## Built-in wallpaper technologies
 
-1. Launch the installed app, or run `swift run LumaWall` from the repository.
-3. Pick from the built-in wallpaper collection (Aurora plus Metal, WebGL, Canvas and audio-reactive designs) and choose **Set Wallpaper**.
-4. Enable system audio in Settings if you want audio-reactive data.
-5. The built-in collection already exercises Metal, WebGL/Canvas, mouse interaction and FFT data; `Examples/WebSpectrum.wall` remains available as an importable creator example.
+LumaWall currently includes native procedural wallpapers plus import support for:
 
-ScreenCaptureKit requires the user's screen-recording/capture permission. Launch-at-login is intended for the signed app-bundle distribution build rather than an arbitrary command-line location. Apple recommends requesting screen-capture permission before capturing content.
+- static images
+- hardware-decoded video via AVFoundation
+- HTML/CSS/JavaScript
+- Canvas and WebGL
+- native Metal fragment shaders
+- mouse-reactive scenes
+- system-audio-reactive scenes using FFT data
 
-## Creator package
+## Updates
 
-A wallpaper package is a ZIP archive with the `.wall` extension, or an unpacked development directory:
+Open:
+
+**LumaWall → Settings → Updates**
+
+LumaWall checks the official GitHub Releases feed. When a newer version is available, it can download the macOS DMG or PKG into Downloads and open the installer.
+
+## Recovery
+
+If a wallpaper causes problems, open:
+
+**LumaWall → Settings → Recovery**
+
+From there you can:
+
+- start the next launch in Safe Mode
+- stop all wallpapers
+- clear saved display assignments
+- open diagnostics
+- open macOS crash reports
+
+No Terminal recovery command is required.
+
+## Wallpaper packages
+
+LumaWall registers `.wall` as its wallpaper package type. An installed build can open `.wall` packages directly from Finder and import them into the local library.
+
+A creator package contains a manifest and local assets:
 
 ```text
 MyWallpaper.wall/
@@ -70,33 +84,33 @@ MyWallpaper.wall/
     └── shader.metal
 ```
 
-See `docs/wallpaper-format.md`, `docs/creator-api.md`, `docs/security.md`, and `steps.md`.
+See `docs/wallpaper-format.md`, `docs/creator-api.md`, and `docs/security.md`.
 
-## Distribution
-
-Run `make package` to build `LumaWall.app`, ZIP, DMG, PKG, and SHA-256 checksums. See `docs/distribution.md` for signing and notarization details.
-
-## Validation
-
-`.github/workflows/macos-build.yml` runs `swift build`, `swift test`, and the installable packaging pipeline on a macOS runner because Linux cannot link the Apple-only frameworks used by the engine.
-
-## Architecture
+## macOS architecture
 
 ```text
-SwiftUI / Menu Bar
-       │
-    AppModel
-       │
-WallpaperEngine ── PerformanceGovernor
-       │                 │
-  one window        fullscreen / game
-  per display       battery / thermal
-       │
-WallpaperRenderer
+SwiftUI control app + menu bar
+          │
+       AppModel
+          │
+WallpaperEngine ─── PerformanceGovernor
+          │                  │
+ non-activating        fullscreen / game
+ panel per display     battery / thermal
+          │
+ WallpaperRenderer
  ├─ Image
  ├─ Video / AVFoundation
  ├─ Web / WKWebView / WebGL
  └─ Metal / MTKView
-       │
+          │
  mouse + creator properties + permission-gated audio FFT
 ```
+
+LumaWall targets **macOS 14 or later**.
+
+## Developer notes
+
+Development and release automation still use SwiftPM and shell scripts internally, but those are not part of the user experience. CI builds, tests, and produces the installable `.app`, ZIP, DMG, and PKG automatically.
+
+See `docs/distribution.md`, `CHANGELOG.md`, and `steps.md` for implementation details.

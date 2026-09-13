@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1 - App-only macOS UX
+
+### Native user flow
+- First-run macOS onboarding inside LumaWall.
+- No Terminal instructions in the user-facing app flow.
+- Welcome guide can be reopened from Settings.
+- Safe Mode and recovery are fully accessible from Settings.
+- Native Updates tab checks GitHub Releases and downloads/opens the DMG or PKG.
+- Settings reorganized into General, Performance, Audio, Updates, Recovery and About.
+- Product messaging explicitly treats LumaWall as a macOS-only app.
+
 ## 0.3.0 - Productization milestone
 
 ### Library

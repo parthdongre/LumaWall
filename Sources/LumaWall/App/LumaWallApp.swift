@@ -10,6 +10,15 @@ struct LumaWallApp: App {
       ContentView()
         .environmentObject(model)
         .frame(minWidth: 980, minHeight: 640)
+        .sheet(
+          isPresented: Binding(
+            get: { model.showOnboarding },
+            set: { model.showOnboarding = $0 }
+          )
+        ) {
+          OnboardingView()
+            .environmentObject(model)
+        }
     }
     .commands {
       CommandMenu("Wallpaper") {
