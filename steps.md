@@ -179,3 +179,10 @@ Fullscreen activity is now mapped to individual CoreGraphics display IDs instead
 Fullscreen display IDs are passed separately from the global performance policy. WallpaperEngine pauses only the renderers assigned to those displays, suppresses audio/mouse updates for them, and orders their wallpaper panels out. Other monitors keep rendering normally.
 
 Wallpaper panels no longer use fullScreenAuxiliary, because that collection behavior explicitly permits them to join another application's fullscreen Space. This fixes the case where a browser/YouTube fullscreen window could be visually replaced or covered by the live wallpaper.
+
+
+## Styled DMG installer
+
+The original DMG was built directly from a source folder containing LumaWall.app and an Applications symlink. That technically included the right files, but it did not create Finder icon-view metadata, so the mounted installer could appear as an empty or unhelpful window depending on Finder state.
+
+The packaging flow now creates an editable DMG first, mounts it, writes a generated branded background plus Finder .DS_Store layout metadata, places LumaWall.app on the left and Applications on the right, then converts the result into the compressed distribution DMG. CI mounts the final compressed DMG again and verifies the visible installer contents and embedded SwiftPM resource bundle before the artifact is accepted.

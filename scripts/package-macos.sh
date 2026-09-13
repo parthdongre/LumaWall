@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${VERSION:-0.3.3}"
+VERSION="${VERSION:-0.3.4}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 BUNDLE_ID="${BUNDLE_ID:-dev.parthdongre.LumaWall}"
 DIST="$ROOT/dist"
@@ -135,12 +135,77 @@ PKG="$DIST/LumaWall-$VERSION.pkg"
 echo "==> Creating ZIP"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
-echo "==> Creating DMG"
+echo "==> Creating styled DMG"
 DMG_ROOT="$(mktemp -d)"
-trap 'rm -rf "$DMG_ROOT"' EXIT
+MOUNT_DIR="$(mktemp -d)"
+RW_DMG="$DIST/LumaWall-$VERSION-rw.dmg"
+VOLUME_NAME="LumaWall $VERSION"
+
+cleanup() {
+  if mount | grep -Fq "$MOUNT_DIR"; then
+    hdiutil detach "$MOUNT_DIR" -quiet || true
+  fi
+  rm -rf "$DMG_ROOT" "$MOUNT_DIR"
+  rm -f "$RW_DMG"
+}
+trap cleanup EXIT
+
 ditto "$APP" "$DMG_ROOT/LumaWall.app"
 ln -s /Applications "$DMG_ROOT/Applications"
-hdiutil create   -volname "LumaWall $VERSION"   -srcfolder "$DMG_ROOT"   -ov   -format UDZO   "$DMG" >/dev/null
+
+mkdir -p "$DMG_ROOT/.background"
+swift "$ROOT/scripts/make-dmg-background.swift" "$DMG_ROOT/.background/background.png"
+
+hdiutil create \
+  -volname "$VOLUME_NAME" \
+  -srcfolder "$DMG_ROOT" \
+  -ov \
+  -format UDRW \
+  "$RW_DMG" >/dev/null
+
+hdiutil attach \
+  "$RW_DMG" \
+  -readwrite \
+  -noverify \
+  -noautoopen \
+  -mountpoint "$MOUNT_DIR" >/dev/null
+
+osascript <<APPLESCRIPT
+tell application "Finder"
+  tell disk "$VOLUME_NAME"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set pathbar visible of container window to false
+    set bounds of container window to {200, 200, 860, 620}
+
+    set viewOptions to icon view options of container window
+    set arrangement of viewOptions to not arranged
+    set icon size of viewOptions to 112
+    set text size of viewOptions to 13
+    set background picture of viewOptions to file ".background:background.png"
+
+    set position of item "LumaWall.app" of container window to {180, 220}
+    set position of item "Applications" of container window to {480, 220}
+
+    update without registering applications
+    delay 2
+    close container window
+  end tell
+end tell
+APPLESCRIPT
+
+sync
+hdiutil detach "$MOUNT_DIR" -quiet
+
+hdiutil convert \
+  "$RW_DMG" \
+  -format UDZO \
+  -imagekey zlib-level=9 \
+  -o "$DMG" >/dev/null
+
+rm -f "$RW_DMG"
 
 echo "==> Creating PKG"
 pkgbuild   --component "$APP"   --install-location /Applications   --identifier "$BUNDLE_ID"   --version "$VERSION"   "$PKG" >/dev/null

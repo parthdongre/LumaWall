@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.4 - Styled DMG installer
+
+- Replaced the plain source-folder DMG with a styled Finder installer window.
+- LumaWall.app is positioned on the left and the Applications shortcut on the right.
+- Added a branded installer background with a clear drag-to-Applications instruction.
+- Added persistent Finder icon-view metadata inside the DMG.
+- CI now mounts the finished DMG and verifies LumaWall.app, the Applications alias, the background asset, Finder layout metadata, and packaged resources before uploading the installer.
+
 ## 0.3.2 - Native-resolution hardware-aware rendering
 
 ### Hardware detection
