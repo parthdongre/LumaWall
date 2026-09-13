@@ -107,6 +107,11 @@ struct TimeDateOverlaySettings: Codable, Hashable, Sendable {
   var cornerRadius = 24.0
   var uppercaseDate = false
 
+  // Optional normalized coordinates (0...1, measured from the preview/display
+  // top-left). Optional fields keep existing encoded settings backward compatible.
+  var customNormalizedX: Double? = nil
+  var customNormalizedY: Double? = nil
+
   static let glass = TimeDateOverlaySettings()
 
   static let minimal: TimeDateOverlaySettings = {

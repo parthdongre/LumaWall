@@ -10,6 +10,12 @@
 - Per-wallpaper presentation choices include fit mode, video loop/mute/playback speed and optional Time & Date presets.
 - Large Creator asset copies run away from the main actor to keep the control UI responsive.
 - Added Creator package regression tests for metadata, image/video packaging, thumbnails, unsupported formats and Time/Date presets.
+- Added a dedicated Overlay Studio with live wallpaper preview and free drag positioning for Time & Date.
+- Free overlay placement is stored as normalized coordinates so it survives different Retina resolutions and external displays.
+- Added typography, opacity, glass, corner-radius, timezone and up-to-three world-clock controls to the visual editor.
+- Overlay clock timers now run in the common run-loop mode so UI tracking does not freeze clock updates.
+- Added regression tests for normalized placement, coordinate conversion, safe clamping, fixed anchors and backward-compatible overlay settings.
+- macOS UI capture now renders Creator Studio and Overlay Studio in addition to the existing app surfaces.
 
 ## 0.3.5 - Fullscreen stability regression fix
 

@@ -209,14 +209,17 @@ final class TimeDateOverlayView: NSView {
 
     let interval = settings.showSeconds ? 0.25 : 1.0
 
-    timer = .scheduledTimer(
-      withTimeInterval: interval,
+    let timer = Timer(
+      timeInterval: interval,
       repeats: true
     ) { [weak self] _ in
       Task { @MainActor in
         self?.updateText(force: false)
       }
     }
+
+    self.timer = timer
+    RunLoop.main.add(timer, forMode: .common)
   }
 
   private func updateText(force: Bool) {
@@ -302,28 +305,11 @@ final class TimeDateOverlayView: NSView {
   }
 
   private func originForContainer(size: CGSize) -> CGPoint {
-    let horizontal = CGFloat(settings.horizontalInset)
-    let vertical = CGFloat(settings.verticalInset)
-
-    let left = horizontal
-    let centerX = (bounds.width - size.width) / 2
-    let right = bounds.width - size.width - horizontal
-
-    let bottom = vertical
-    let centerY = (bounds.height - size.height) / 2
-    let top = bounds.height - size.height - vertical
-
-    switch settings.position {
-    case .topLeft: return CGPoint(x: left, y: top)
-    case .topCenter: return CGPoint(x: centerX, y: top)
-    case .topRight: return CGPoint(x: right, y: top)
-    case .centerLeft: return CGPoint(x: left, y: centerY)
-    case .center: return CGPoint(x: centerX, y: centerY)
-    case .centerRight: return CGPoint(x: right, y: centerY)
-    case .bottomLeft: return CGPoint(x: left, y: bottom)
-    case .bottomCenter: return CGPoint(x: centerX, y: bottom)
-    case .bottomRight: return CGPoint(x: right, y: bottom)
-    }
+    ClockOverlayLayout.appKitOrigin(
+      boundsSize: bounds.size,
+      overlaySize: size,
+      settings: settings
+    )
   }
 }
 

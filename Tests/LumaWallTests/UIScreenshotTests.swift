@@ -93,6 +93,46 @@ func captureMacOSUIScreenshots() async throws {
     to: output.appendingPathComponent("06-onboarding-performance.png")
   )
 
+  if
+    let creatorSource = model.wallpapers
+      .compactMap(\.thumbnailURL)
+      .first(where: { FileManager.default.fileExists(atPath: $0.path) })
+  {
+    model.setCreatorSource(creatorSource)
+    model.creatorDraft.name = "Canva Concept"
+    model.creatorDraft.author = "LumaWall Creator"
+    model.creatorDraft.category = "Minimal"
+    model.creatorDraft.tagsText = "dark, canva, concept"
+    model.creatorDraft.clockPreset = .glass
+  }
+
+  model.sidebarSelection = .creator
+  try capture(
+    ContentView()
+      .environmentObject(model),
+    size: NSSize(width: 1440, height: 920),
+    title: "LumaWall",
+    to: output.appendingPathComponent("07-creator-studio.png")
+  )
+
+  if let overlayWallpaper = model.selectedWallpaperID ?? model.wallpapers.first?.id {
+    model.selectedWallpaperID = overlayWallpaper
+    var overlay = model.timeDateSettings(for: overlayWallpaper)
+    overlay.enabled = true
+    overlay.customNormalizedX = 0.72
+    overlay.customNormalizedY = 0.24
+    model.updateTimeDateSettings(overlay, for: overlayWallpaper)
+  }
+
+  model.sidebarSelection = .overlayStudio
+  try capture(
+    ContentView()
+      .environmentObject(model),
+    size: NSSize(width: 1440, height: 980),
+    title: "LumaWall",
+    to: output.appendingPathComponent("08-overlay-studio.png")
+  )
+
   model.shutdown()
 }
 

@@ -210,3 +210,15 @@ The creator model keeps source artwork separate from LumaWall-owned storage. Cre
 Package construction runs in a detached user-initiated task because 4K/60 video files can be large. Only the final Library/model mutation returns to the main actor. This keeps Creator Studio from freezing the SwiftUI control surface during large file copies.
 
 Creator metadata adds optional description, tags, category, version and source fields to wallpaper.json. They are optional so existing v1 packages remain backward compatible. Presentation settings such as fit, video playback and Time/Date overlay remain user-configurable engine state and are applied immediately after creation.
+
+## v0.4.0 Overlay Studio
+
+The Time/Date renderer remains a native AppKit overlay above the wallpaper renderer, but its product surface is now a dedicated visual editor. Users select any wallpaper, see the real wallpaper thumbnail/preview, and can drag the clock directly to a free position rather than choosing only one of nine anchors.
+
+Free placement is stored as normalized top-left coordinates instead of pixels. ClockOverlayLayout converts the normalized preview position into AppKit's bottom-left coordinate system at runtime, clamps the overlay to the configured safe insets, and therefore preserves the intended composition across MacBook Retina displays and external monitors with different logical sizes.
+
+The existing nine anchor positions remain available and clear the custom coordinates when selected. New custom coordinate fields are optional in Codable settings so previously persisted overlay preferences decode without migration.
+
+Overlay Studio exposes typography, 12/24-hour/system time, seconds, date style, weekday, text color/opacity, glass strength, background opacity, corner radius, timezone and up to three additional world clocks. The same AppModel.updateTimeDateSettings path updates active desktop overlays immediately.
+
+The native overlay timer now runs in the common run-loop mode so mouse tracking and editor interactions do not freeze clock updates. CI captures both Creator Studio and Overlay Studio as actual macOS SwiftUI/AppKit screenshots.

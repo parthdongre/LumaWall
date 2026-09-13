@@ -5,6 +5,7 @@ enum SidebarDestination: Hashable {
   case displays
   case automations
   case creator
+  case overlayStudio
   case diagnostics
   case wallpaper(UUID)
 }
@@ -27,6 +28,8 @@ struct ContentView: View {
         Section("Create") {
           Label("Creator Studio", systemImage: "wand.and.stars")
             .tag(SidebarDestination.creator)
+          Label("Overlay Studio", systemImage: "clock.badge.plus")
+            .tag(SidebarDestination.overlayStudio)
         }
 
         Section("System") {
@@ -54,6 +57,8 @@ struct ContentView: View {
         AutomationView()
       case .creator:
         CreatorStudioView()
+      case .overlayStudio:
+        OverlayStudioView()
       case .diagnostics:
         DiagnosticsView()
       case .wallpaper(let id):
