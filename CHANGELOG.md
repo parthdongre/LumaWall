@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.5 - Fullscreen stability regression fix
+
+- Fixed normal maximized browser/app windows being misclassified as fullscreen.
+- Removed the old 97% display-coverage heuristic; fullscreen now requires the foreground window to reach all four display edges within a small CoreGraphics tolerance.
+- Added two-sample debounce before entering fullscreen pause and immediate resume when fullscreen ends.
+- Fullscreen polling now runs in the common run-loop mode and re-evaluates immediately on app activation and Space changes.
+- Pausing a display no longer orders its wallpaper window out/in, eliminating visible flashes back to the static macOS wallpaper.
+- Wallpaper surfaces now use a deterministic level immediately below Finder desktop icons and are never marked as fullscreen auxiliary windows.
+- Added regression coverage for maximized windows, menu-bar/Dock gaps, multi-display fullscreen, border drift, spanning windows, invisible/nonzero-layer windows, own-process windows, and pause-state flapping.
+
 ## 0.3.4 - Styled DMG installer
 
 - Replaced the plain source-folder DMG with a styled Finder installer window.

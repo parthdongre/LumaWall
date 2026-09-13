@@ -176,7 +176,7 @@ Maximum Resolution is a user-visible lock. While enabled, adaptive performance p
 
 Fullscreen activity is now mapped to individual CoreGraphics display IDs instead of a single global boolean. The foreground application's layer-0 windows are compared with each active display's CoreGraphics bounds; a display is considered occupied when the foreground window covers essentially the whole display.
 
-Fullscreen display IDs are passed separately from the global performance policy. WallpaperEngine pauses only the renderers assigned to those displays, suppresses audio/mouse updates for them, and orders their wallpaper panels out. Other monitors keep rendering normally.
+Fullscreen display IDs are passed separately from the global performance policy. WallpaperEngine pauses only the renderers assigned to those displays and suppresses audio/mouse updates for them. The wallpaper panel itself stays resident at a deterministic level below Finder icons; it is not ordered out/in during fullscreen transitions, which avoids flashing the static macOS wallpaper. Other monitors keep rendering normally.
 
 Wallpaper panels no longer use fullScreenAuxiliary, because that collection behavior explicitly permits them to join another application's fullscreen Space. This fixes the case where a browser/YouTube fullscreen window could be visually replaced or covered by the live wallpaper.
 
@@ -186,3 +186,16 @@ Wallpaper panels no longer use fullScreenAuxiliary, because that collection beha
 The original DMG was built directly from a source folder containing LumaWall.app and an Applications symlink. That technically included the right files, but it did not create Finder icon-view metadata, so the mounted installer could appear as an empty or unhelpful window depending on Finder state.
 
 The packaging flow now creates an editable DMG first, mounts it, writes a generated branded background plus Finder .DS_Store layout metadata, places LumaWall.app on the left and Applications on the right, then converts the result into the compressed distribution DMG. CI mounts the final compressed DMG again and verifies the visible installer contents and embedded SwiftPM resource bundle before the artifact is accepted.
+
+
+## v0.3.5 fullscreen stability regression
+
+A user screen recording exposed two problems in the fullscreen heuristic. A normal maximized browser window on a 2940×1912 Retina MacBook left only the menu-bar strip uncovered, which still exceeded the previous 97% area threshold and was incorrectly treated as fullscreen. Separately, the fullscreen poller used the default run-loop mode, so Dock/window tracking could temporarily delay state updates and leave the renderer paused after switching applications.
+
+Fullscreen classification now ignores area percentage entirely. A foreground layer-0 window must reach all four CoreGraphics display edges within a small six-unit tolerance. This still accepts tiny coordinate drift and borderless games while rejecting ordinary maximized windows, menu-bar gaps, Dock gaps, shifted windows and windows spanning multiple monitors.
+
+Entering fullscreen requires two consistent samples, while leaving fullscreen resumes immediately. The monitor polls every 250 ms in the common run-loop and also reacts to application activation and active-Space changes.
+
+Fullscreen pause is now renderer-only. LumaWall keeps the desktop panel resident below Finder's icon level and never uses fullScreenAuxiliary. The renderer stops producing frames, audio-reactive updates and mouse interaction for that display, but the panel is not removed and reinserted, avoiding desktop flicker and ordering races.
+
+The regression suite includes the exact high-coverage maximized-window case from the recording plus multi-display, edge-tolerance, spanning-window, alpha/layer, own-process and debounce-flapping cases.

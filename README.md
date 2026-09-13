@@ -12,7 +12,7 @@ A native macOS live-wallpaper engine built with **SwiftUI, AppKit, Metal, WebKit
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-090909?style=for-the-badge&logo=apple&logoColor=white" />
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-090909?style=for-the-badge&logo=swift&logoColor=F05138" />
   <img alt="Metal" src="https://img.shields.io/badge/Metal-GPU-090909?style=for-the-badge&logo=apple&logoColor=E32636" />
-  <img alt="Version 0.3.2" src="https://img.shields.io/badge/v0.3.2-LIVE-E32636?style=for-the-badge" />
+  <img alt="Version 0.3.5" src="https://img.shields.io/badge/v0.3.5-LIVE-E32636?style=for-the-badge" />
 </p>
 
 </div>
@@ -152,9 +152,9 @@ Packaging creates:
 ```text
 dist/
 ├── LumaWall.app
-├── LumaWall-0.3.2-macOS.zip
-├── LumaWall-0.3.2.dmg
-├── LumaWall-0.3.2.pkg
+├── LumaWall-0.3.5-macOS.zip
+├── LumaWall-0.3.5.dmg
+├── LumaWall-0.3.5.pkg
 └── SHA256SUMS.txt
 ```
 
