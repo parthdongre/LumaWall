@@ -468,6 +468,11 @@ final class AppModel: ObservableObject {
     if !quarantine.quarantinedIDs.isEmpty {
       statusMessage =
         "\(quarantine.quarantinedIDs.count) wallpaper(s) are quarantined after repeated crashes."
+    } else if !quarantine.previousLaunchWasClean,
+      !quarantine.suspectedWallpaperIDs.isEmpty
+    {
+      statusMessage =
+        "LumaWall recovered from an unclean exit. Active wallpapers were recorded for stability tracking."
     }
 
     applyAutomaticPowerProfile()
@@ -542,6 +547,8 @@ final class AppModel: ObservableObject {
     Foreground App: \(governor.foregroundActivity.ownerName ?? "Unknown")
     Foreground Fullscreen: \(governor.foregroundActivity.isFullscreen)
     Foreground Game: \(governor.foregroundActivity.isGame)
+    System Suspended: \(suspension.isSuspended)
+    Suspension Reasons: \(suspension.activeReasons.map(\.displayName).sorted().joined(separator: ", "))
 
     Library
     -------
@@ -549,6 +556,12 @@ final class AppModel: ObservableObject {
     Favorites: \(favoriteWallpaperIDs.count)
     Recent: \(recentWallpaperIDs.count)
     System Audio Enabled: \(systemAudioEnabled)
+
+    Stability
+    ---------
+    Previous Launch Clean: \(quarantine.previousLaunchWasClean)
+    Suspected Wallpapers: \(quarantine.suspectedWallpaperIDs.count)
+    Quarantined Wallpapers: \(quarantine.quarantinedIDs.count)
 
     Displays / Assignments
     ----------------------
