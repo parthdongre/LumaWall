@@ -56,6 +56,7 @@ final class AppModel: ObservableObject {
   let updater = UpdateService()
   let power = PowerSourceMonitor()
   let quarantine = CrashQuarantineService()
+  let suspension = SystemSuspensionCoordinator()
   let lockScreen = LockScreenSnapshotService()
   let discover = DiscoverCatalogService()
   let livePreview = LivePreviewCoordinator()
@@ -65,6 +66,7 @@ final class AppModel: ObservableObject {
   private var cancellables = Set<AnyCancellable>()
   private var previewGenerationInFlight = Set<UUID>()
   private var lockScreenRefreshTask: Task<Void, Never>?
+  private var suspensionAudioTask: Task<Void, Never>?
   private var telemetryTimer: Timer?
   private let defaults = UserDefaults.standard
 
@@ -262,6 +264,27 @@ final class AppModel: ObservableObject {
     audio.onFrame = { [weak self] frame in
       Task { @MainActor in self?.engine.updateAudio(frame) }
     }
+
+    suspension.onChanged = { [weak self] suspended in
+      guard let self else { return }
+
+      self.engine.setSystemSuspended(suspended)
+      self.suspensionAudioTask?.cancel()
+      self.suspensionAudioTask = nil
+
+      guard self.systemAudioEnabled else { return }
+
+      self.suspensionAudioTask = Task { @MainActor [weak self] in
+        guard let self, !Task.isCancelled else { return }
+
+        if suspended {
+          await self.audio.stop()
+        } else {
+          try? await self.audio.startSystemAudio()
+        }
+      }
+    }
+
     automation.onWallpaperRequested = { [weak self] id in
       self?.applyWallpaper(id: id, to: nil)
     }
@@ -371,10 +394,7 @@ final class AppModel: ObservableObject {
       queue: .main
     ) { [weak self] _ in
       Task { @MainActor in
-        self?.engine.setSystemSuspended(true)
-        if self?.systemAudioEnabled == true {
-          await self?.audio.stop()
-        }
+        self?.suspension.set(.systemSleep, active: true)
       }
     }
 
@@ -384,11 +404,7 @@ final class AppModel: ObservableObject {
       queue: .main
     ) { [weak self] _ in
       Task { @MainActor in
-        guard let self else { return }
-        self.engine.setSystemSuspended(false)
-        if self.systemAudioEnabled {
-          try? await self.audio.startSystemAudio()
-        }
+        self?.suspension.set(.systemSleep, active: false)
       }
     }
 
@@ -398,7 +414,7 @@ final class AppModel: ObservableObject {
       queue: .main
     ) { [weak self] _ in
       Task { @MainActor in
-        self?.engine.setSystemSuspended(true)
+        self?.suspension.set(.screensSleep, active: true)
       }
     }
 
@@ -408,7 +424,27 @@ final class AppModel: ObservableObject {
       queue: .main
     ) { [weak self] _ in
       Task { @MainActor in
-        self?.engine.setSystemSuspended(false)
+        self?.suspension.set(.screensSleep, active: false)
+      }
+    }
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.sessionDidResignActiveNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        self?.suspension.set(.sessionInactive, active: true)
+      }
+    }
+
+    NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.sessionDidBecomeActiveNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        self?.suspension.set(.sessionInactive, active: false)
       }
     }
 
@@ -618,6 +654,9 @@ final class AppModel: ObservableObject {
   func shutdown() {
     lockScreenRefreshTask?.cancel()
     lockScreenRefreshTask = nil
+    suspensionAudioTask?.cancel()
+    suspensionAudioTask = nil
+    suspension.onChanged = nil
     telemetryTimer?.invalidate()
     telemetryTimer = nil
     livePreview.stop()
@@ -1181,18 +1220,21 @@ final class AppModel: ObservableObject {
 
   func setSystemAudioEnabled(_ enabled: Bool) {
     systemAudioEnabled = enabled
-    Task {
+
+    suspensionAudioTask?.cancel()
+    suspensionAudioTask = Task { @MainActor [weak self] in
+      guard let self, !Task.isCancelled else { return }
+
       do {
-        if enabled {
-          try await audio.startSystemAudio()
+        if enabled, !self.suspension.isSuspended {
+          try await self.audio.startSystemAudio()
         } else {
-          await audio.stop()
+          await self.audio.stop()
         }
       } catch {
-        await MainActor.run {
-          self.systemAudioEnabled = false
-          self.show(error)
-        }
+        guard !Task.isCancelled else { return }
+        self.systemAudioEnabled = false
+        self.show(error)
       }
     }
   }
