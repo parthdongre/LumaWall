@@ -618,8 +618,10 @@ struct SettingsView: View {
     Form {
       Section {
         VStack(spacing: 12) {
-          Image(systemName: "sparkles.rectangle.stack.fill")
-            .font(.system(size: 58))
+          Image(nsImage: NSApp.applicationIconImage)
+            .resizable()
+            .interpolation(.high)
+            .frame(width: 72, height: 72)
           Text("LumaWall")
             .font(.largeTitle.bold())
           Text("Native live wallpapers for macOS")
