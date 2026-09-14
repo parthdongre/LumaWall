@@ -122,3 +122,34 @@ jobs:
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
+
+
+  command-line-tools:
+    name: Command Line Tools compatibility
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Command Line Tools installation
+        run: test -d /Library/Developer/CommandLineTools
+
+      - name: Select Command Line Tools
+        run: sudo xcode-select --switch /Library/Developer/CommandLineTools
+
+      - name: Show selected toolchain
+        run: |
+          xcode-select -p
+          swift --version
+          xcrun --sdk macosx --show-sdk-path
+
+      - name: LumaWall doctor
+        run: make doctor
+
+      - name: Debug build with Command Line Tools
+        run: swift build
+
+      - name: Test with Command Line Tools
+        run: swift test
+
+      - name: Release build with Command Line Tools
+        run: swift build -c release
