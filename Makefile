@@ -1,7 +1,10 @@
-.PHONY: doctor run build test clean package install
+.PHONY: doctor repair run build test verify clean package install
 
 doctor:
 	bash scripts/doctor.sh
+
+repair:
+	bash scripts/repair-dev.sh
 
 run: doctor
 	swift run LumaWall
@@ -11,6 +14,11 @@ build: doctor
 
 test: doctor
 	swift test
+
+verify: doctor
+	swift build
+	swift test
+	swift build -c release
 
 clean:
 	rm -rf .build dist
