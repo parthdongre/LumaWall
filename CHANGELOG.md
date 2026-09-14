@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added Developer ID Application and Developer ID Installer support to the packaging pipeline.
+- Added notarization and stapling automation for public DMG/PKG releases.
+- Public tag releases now fail closed when signing or notarization credentials are missing.
+- Added release verification for signatures, checksums, notarization tickets, and Gatekeeper assessment.
+- Checksums are regenerated after stapling so in-app update verification matches the exact published installers.
 - Hardened in-app updates with SHA-256 verification against the release checksum manifest before opening a DMG or PKG.
 - Added automatic update checks at most once per day, enabled by default and user-toggleable in Settings.
 - Added update integrity regression tests for version comparison, checksum parsing, and chunked file hashing.
