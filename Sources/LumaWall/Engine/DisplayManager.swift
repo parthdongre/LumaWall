@@ -1,8 +1,10 @@
 import AppKit
+import ColorSync
 import CoreGraphics
 
 struct DisplayDescriptor: Identifiable, Hashable {
   let id: CGDirectDisplayID
+  let persistentID: String
   let screen: NSScreen
   let name: String
   let nativePixelSize: CGSize
@@ -72,6 +74,14 @@ enum DisplayManager {
       let id =
         CGDirectDisplayID(number.uint32Value)
 
+      let persistentID: String
+      if let unmanagedUUID = CGDisplayCreateUUIDFromDisplayID(id) {
+        let uuid = unmanagedUUID.takeRetainedValue()
+        persistentID = CFUUIDCreateString(nil, uuid) as String
+      } else {
+        persistentID = "cg-display-\(id)"
+      }
+
       let mode =
         CGDisplayCopyDisplayMode(id)
 
@@ -99,6 +109,7 @@ enum DisplayManager {
 
       return DisplayDescriptor(
         id: id,
+        persistentID: persistentID,
         screen: screen,
         name: screen.localizedName,
         nativePixelSize: nativePixels,
