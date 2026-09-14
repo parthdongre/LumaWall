@@ -8,7 +8,7 @@ struct InstallationRecommendationBanner: View {
       HStack(spacing: 12) {
         Image(systemName: "arrow.down.app.fill")
           .font(.title2)
-          .foregroundStyle(.tint)
+          .foregroundStyle(Color.accentColor)
 
         VStack(alignment: .leading, spacing: 3) {
           Text(model.installationLocation.recommendationTitle)
