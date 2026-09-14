@@ -15,6 +15,32 @@ struct DisplayDescriptor: Identifiable, Hashable {
   let isBuiltIn: Bool
   let maximumEDR: CGFloat
 
+  init(
+    id: CGDirectDisplayID,
+    persistentID: String = "",
+    screen: NSScreen,
+    name: String,
+    nativePixelSize: CGSize,
+    logicalPointSize: CGSize,
+    backingScaleFactor: CGFloat,
+    maximumFPS: Int,
+    refreshRate: Double,
+    isBuiltIn: Bool,
+    maximumEDR: CGFloat
+  ) {
+    self.id = id
+    self.persistentID = persistentID
+    self.screen = screen
+    self.name = name
+    self.nativePixelSize = nativePixelSize
+    self.logicalPointSize = logicalPointSize
+    self.backingScaleFactor = backingScaleFactor
+    self.maximumFPS = maximumFPS
+    self.refreshRate = refreshRate
+    self.isBuiltIn = isBuiltIn
+    self.maximumEDR = maximumEDR
+  }
+
   static func == (
     lhs: DisplayDescriptor,
     rhs: DisplayDescriptor
