@@ -124,8 +124,8 @@ jobs:
           retention-days: 14
 
 
-  command-line-tools:
-    name: Command Line Tools compatibility
+  command-line-tools-diagnostic:
+    name: Command Line Tools diagnostic
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -136,20 +136,20 @@ jobs:
       - name: Select Command Line Tools
         run: sudo xcode-select --switch /Library/Developer/CommandLineTools
 
-      - name: Show selected toolchain
+      - name: Confirm doctor fails with the actionable SwiftUI macro reason
+        shell: bash
         run: |
-          xcode-select -p
-          swift --version
-          xcrun --sdk macosx --show-sdk-path
+          set +e
+          OUTPUT="$(make doctor 2>&1)"
+          STATUS=$?
+          set -e
 
-      - name: LumaWall doctor
-        run: make doctor
+          printf '%s\n' "$OUTPUT"
 
-      - name: Debug build with Command Line Tools
-        run: swift build
+          if [[ "$STATUS" -eq 0 ]]; then
+            echo "Expected make doctor to reject a CLT-only SwiftUI toolchain." >&2
+            exit 1
+          fi
 
-      - name: Test with Command Line Tools
-        run: swift test
-
-      - name: Release build with Command Line Tools
-        run: swift build -c release
+          grep -q "Command Line Tools are selected instead of full Xcode" <<< "$OUTPUT"
+          grep -q "SwiftUIMacros.StateMacro" <<< "$OUTPUT"
