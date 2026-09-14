@@ -519,6 +519,41 @@ struct SettingsView: View {
         }
       }
 
+      Section("Stability history") {
+        LabeledContent(
+          "Previous launch",
+          value: model.quarantine.previousLaunchWasClean ? "Clean" : "Unclean"
+        )
+
+        if !model.suspectedCrashWallpapers.isEmpty {
+          VStack(alignment: .leading, spacing: 6) {
+            Text("Wallpapers active during the previous unclean exit:")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+
+            ForEach(model.suspectedCrashWallpapers) { wallpaper in
+              HStack {
+                Text(wallpaper.name)
+                Spacer()
+                Text("\(model.quarantine.crashCount(for: wallpaper.id)) / 3")
+                  .font(.caption.monospacedDigit())
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+        }
+
+        Button("Reset Stability History", role: .destructive) {
+          model.resetStabilityHistory()
+        }
+
+        Text(
+          "LumaWall quarantines a wallpaper after three unclean exits while it was active. Stopping a wallpaper removes it from crash attribution immediately."
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+
       Section("Crash quarantine") {
         let quarantined = model.wallpapers.filter {
           model.isQuarantined($0.id)
