@@ -192,6 +192,30 @@ struct DiagnosticsView: View {
           }
         }
 
+        GroupBox("Stability") {
+          VStack(alignment: .leading, spacing: 8) {
+            diagnosticRow(
+              "Previous launch",
+              model.quarantine.previousLaunchWasClean ? "Clean" : "Unclean"
+            )
+            diagnosticRow(
+              "Suspected wallpapers",
+              "\(model.quarantine.suspectedWallpaperIDs.count)"
+            )
+            diagnosticRow(
+              "Quarantined wallpapers",
+              "\(model.quarantine.quarantinedIDs.count)"
+            )
+
+            ForEach(model.suspectedCrashWallpapers) { wallpaper in
+              diagnosticRow(
+                wallpaper.name,
+                "\(model.quarantine.crashCount(for: wallpaper.id)) stability strike(s)"
+              )
+            }
+          }
+        }
+
         GroupBox("Foreground activity") {
           VStack(alignment: .leading, spacing: 8) {
             diagnosticRow(
