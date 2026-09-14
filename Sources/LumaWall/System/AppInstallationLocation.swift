@@ -49,11 +49,11 @@ struct AppInstallationLocation: Equatable {
     return "LumaWall works best from Applications so Launch at Login, updates, and macOS app registration use a stable location."
   }
 
-  func openApplicationsFolder() {
+  @MainActor\n  func openApplicationsFolder() {
     NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications", isDirectory: true))
   }
 
-  func revealCurrentApp() {
+  @MainActor\n  func revealCurrentApp() {
     guard isAppBundle else { return }
     NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
   }
