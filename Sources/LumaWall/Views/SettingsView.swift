@@ -389,6 +389,35 @@ struct SettingsView: View {
   private var audio: some View {
     Form {
       Section("Audio-reactive wallpapers") {
+        HStack {
+          Label(
+            model.screenCapturePermission.isGranted
+              ? "Screen & System Audio Recording access granted"
+              : "Screen & System Audio Recording access required",
+            systemImage: model.screenCapturePermission.isGranted
+              ? "checkmark.shield.fill"
+              : "exclamationmark.shield.fill"
+          )
+          .foregroundStyle(
+            model.screenCapturePermission.isGranted
+              ? Color.green
+              : Color.orange
+          )
+
+          Spacer()
+
+          Button("Refresh") {
+            model.refreshScreenCapturePermission()
+          }
+        }
+
+        if !model.screenCapturePermission.isGranted {
+          Button("Request Permission") {
+            model.requestScreenCapturePermission()
+          }
+          .buttonStyle(.borderedProminent)
+        }
+
         Toggle(
           "Capture system audio",
           isOn: Binding(
@@ -398,7 +427,7 @@ struct SettingsView: View {
         )
 
         Text(
-          "macOS will ask for Screen Recording permission the first time system-audio capture is enabled. LumaWall excludes its own process audio."
+          "Audio-reactive wallpapers use macOS Screen & System Audio Recording permission. LumaWall captures only audio data needed for FFT analysis, excludes its own process audio, and does not save recordings."
         )
         .font(.caption)
         .foregroundStyle(.secondary)
