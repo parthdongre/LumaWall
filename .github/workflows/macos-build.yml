@@ -22,11 +22,18 @@ jobs:
       - name: Swift version
         run: swift --version
 
-      - name: Validate release scripts
+      - name: Validate scripts and package manifest
         run: |
+          bash -n scripts/doctor.sh
+          bash -n scripts/repair-dev.sh
           bash -n scripts/package-macos.sh
           bash -n scripts/notarize-macos.sh
           bash -n scripts/verify-release.sh
+          swift package dump-package >/dev/null
+          swiftc -frontend -parse scripts/make-app-icon.swift
+
+      - name: Development environment doctor
+        run: make doctor
 
       - name: Build
         run: swift build
