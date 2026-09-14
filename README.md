@@ -147,7 +147,14 @@ swift run LumaWall
 ```bash
 make build
 make test
+make verify   # doctor + debug build + tests + release build
 make package
+```
+
+If you change Xcode/toolchains or hit stale SwiftPM errors from an older checkout:
+
+```bash
+make repair
 ```
 
 Packaging creates:
