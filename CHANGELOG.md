@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added explicit Screen & System Audio Recording permission status, request/refresh controls, revoke handling, diagnostics, and isolated permission-state tests.
 - Added a macOS 26 compatibility CI lane that runs the doctor, debug build, full tests, and release build on the Tahoe-generation runner.
 - Added a real SwiftUI macro compiler probe to `make doctor`; CLT-only setups now fail with the actionable `SwiftUIMacros.StateMacro` reason instead of conflating it with Metal.
 - Added `make repair` to clear stale SwiftPM build state after toolchain/resource changes and `make verify` for debug build + tests + release build.
