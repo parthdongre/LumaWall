@@ -302,3 +302,12 @@ Notarization is a second script rather than being hidden inside packaging. This 
 Stapling changes DMG/PKG bytes, so the checksum manifest is regenerated only after notarization completes. This ordering is important because LumaWall's in-app updater now verifies the exact published installer against SHA256SUMS.txt before opening it.
 
 The release verifier has two levels. Development CI checks the app signature and checksum consistency. Public tag builds additionally require Developer ID identities, stapled tickets, and successful Gatekeeper assessment. A tagged release therefore fails closed instead of silently falling back to an ad-hoc build.
+
+
+## Native install-location guidance
+
+A packaged Mac app can technically run from Downloads or directly from a mounted DMG, but that is a poor permanent state for LumaWall because Launch at Login, update installation, Finder file associations, and general app registration all assume a stable application path.
+
+LumaWall now classifies only real .app bundles. SwiftPM development runs are ignored, so developers do not see consumer installation warnings. Packaged copies under either /Applications or a user's Applications folder are accepted. Copies under /Volumes are recognized as running from an installer disk image; other packaged locations such as Downloads receive a softer move-to-Applications recommendation.
+
+The app does not move itself automatically. Instead, onboarding, the main app surface, and Settings provide native Finder handoff actions to reveal the current app and open Applications. This keeps file movement explicit and avoids mutating a running bundle or requesting unnecessary privileges.
