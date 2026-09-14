@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${VERSION:-0.4.0}"
+VERSION="${VERSION:-$(tr -d '[:space:]' < "$ROOT/VERSION")}"
 DIST="$ROOT/dist"
 APP="$DIST/LumaWall.app"
 ZIP="$DIST/LumaWall-$VERSION-macOS.zip"
