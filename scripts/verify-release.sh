@@ -21,6 +21,11 @@ for artifact in "$APP" "$ZIP" "$DMG" "$PKG" "$CHECKSUMS"; do
   fi
 done
 
+echo "==> Verifying packaged app metadata"
+test -f "$APP/Contents/Resources/LumaWall.icns"
+ICON_FILE="$(plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist")"
+test "$ICON_FILE" = "LumaWall.icns"
+
 echo "==> Verifying app signature"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
