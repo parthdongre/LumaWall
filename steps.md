@@ -328,3 +328,12 @@ The root VERSION file is the release source of truth for shell packaging and CI.
 AppVersion.fallbackVersion remains a compile-time Swift fallback for source/development launches, but a regression test reads VERSION relative to the test source tree and requires both values to match. Tagged release workflows also compare the tag against VERSION and fail before signing or publishing on mismatch.
 
 This keeps the installed Info.plist version, artifact filenames, update comparison, checksums, and release tag aligned through a version bump.
+
+
+## Packaged macOS app identity
+
+The distributable app now generates a deterministic Retina iconset during packaging rather than relying on Finder's generic executable/app icon. The generator is a Swift/AppKit script so it runs on the same macOS build environment already required by LumaWall and does not add checked-in binary icon assets.
+
+package-macos.sh converts the generated iconset into LumaWall.icns, embeds it under Contents/Resources, and declares it through CFBundleIconFile. Release verification and mounted-DMG CI both assert that the icon exists and that Info.plist points to it.
+
+Onboarding and About read NSApplication's actual applicationIconImage, so the same packaged identity is reused inside the app instead of duplicating a separate branding asset path.
