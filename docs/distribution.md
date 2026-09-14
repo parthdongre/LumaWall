@@ -2,6 +2,12 @@
 
 LumaWall can be used directly from SwiftPM during development, but normal users should install the app bundle.
 
+## Release version
+
+The root `VERSION` file is the default version for local packaging, CI artifacts, notarization, and verification. Update it together with `AppVersion.fallbackVersion`; the test suite enforces that they match.
+
+Tagged public releases must use the same version as `VERSION`. A mismatched tag fails before signing or publishing.
+
 ## Build installable artifacts
 
 From the repository root, verify the Apple developer toolchain first:
