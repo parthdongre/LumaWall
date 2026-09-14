@@ -45,43 +45,105 @@ make install
 
 This packages the current source, copies LumaWall to `/Applications`, and opens it.
 
-## Code signing
+## Development signing
 
-Without an Apple Developer certificate, `package-macos.sh` applies an ad-hoc signature. This is useful for development and private testing, but downloaded builds may still trigger Gatekeeper warnings.
+Without an Apple Developer certificate, `package-macos.sh` applies an ad-hoc signature. This is useful for local development and CI smoke testing, but it is not the public release path and downloaded builds may trigger Gatekeeper warnings.
 
-If a Developer ID Application identity is already installed in the current keychain:
+## Developer ID signing
+
+Public releases use two separate Apple identities:
+
+- **Developer ID Application** signs `LumaWall.app` and the DMG.
+- **Developer ID Installer** signs the PKG.
+
+If those identities already exist in the current keychain:
 
 ```bash
-SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+APP_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+PKG_SIGN_IDENTITY="Developer ID Installer: Your Name (TEAMID)" \
 VERSION=0.4.0 \
 ./scripts/package-macos.sh
 ```
 
-The script then signs the app with the hardened runtime and timestamp.
+`SIGN_IDENTITY` remains accepted as a backward-compatible alias for the app-signing identity.
 
-## Notarization
+The app signature uses the hardened runtime and a trusted timestamp. The packaging script verifies the app signature before creating release containers.
 
-For a public release distributed outside the Mac App Store, the recommended final pipeline is:
+## Notarization and stapling
 
-1. sign `LumaWall.app` with Developer ID Application;
-2. package it into the DMG/ZIP;
-3. submit the DMG or ZIP with `xcrun notarytool`;
-4. wait for Apple approval;
-5. staple the notarization ticket to the app/DMG;
-6. publish checksums with the release.
+After a Developer ID-signed package is created, run:
 
-The current repository intentionally does not hard-code developer credentials. When Developer ID credentials are available, the release workflow can import them from GitHub Actions secrets.
+```bash
+VERSION=0.4.0 \
+NOTARY_KEY_FILE="/path/to/AuthKey_KEYID.p8" \
+NOTARY_KEY_ID="KEYID" \
+NOTARY_ISSUER_ID="ISSUER_UUID" \
+./scripts/notarize-macos.sh
+```
 
-## GitHub Actions
+The script supports three authentication modes:
 
-`.github/workflows/macos-build.yml` now builds, tests, packages, and uploads installable artifacts for pushes to `main`.
+1. `NOTARY_KEYCHAIN_PROFILE` created with `notarytool store-credentials`;
+2. App Store Connect API key variables: `NOTARY_KEY_FILE`, `NOTARY_KEY_ID`, and `NOTARY_ISSUER_ID`;
+3. Apple ID variables: `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_PASSWORD`.
 
-`.github/workflows/release.yml` supports:
+The notarization script submits the DMG and PKG with `xcrun notarytool --wait`, staples the returned tickets, validates both tickets, and then regenerates `SHA256SUMS.txt`.
 
-- versioned manual package builds via **Run workflow**;
-- automatic GitHub Releases for tags such as `v0.4.0`.
+Regenerating checksums **after stapling is required** because stapling modifies the release container bytes.
 
-A tag release publishes the ZIP, DMG, PKG, and SHA-256 checksum file.
+## Release verification
+
+Run:
+
+```bash
+VERSION=0.4.0 ./scripts/verify-release.sh
+```
+
+Development builds verify the app signature and all SHA-256 entries.
+
+For a public build:
+
+```bash
+VERSION=0.4.0 \
+REQUIRE_DEVELOPER_ID=1 \
+REQUIRE_NOTARIZED=1 \
+./scripts/verify-release.sh
+```
+
+That additionally verifies Developer ID identities, validates stapled notarization tickets, and asks Gatekeeper to assess the DMG and PKG.
+
+## GitHub Actions public-release policy
+
+`.github/workflows/macos-build.yml` continues to produce ad-hoc signed CI artifacts for development and smoke testing.
+
+`.github/workflows/release.yml` has two modes:
+
+- **manual workflow dispatch**: development packaging, which may remain ad-hoc;
+- **version tag such as `v0.4.0`**: public release, which now fails closed unless signing and notarization credentials are configured.
+
+A tagged public release requires these GitHub Actions secrets:
+
+```text
+MACOS_CERTIFICATE_P12
+MACOS_CERTIFICATE_PASSWORD
+APP_SIGN_IDENTITY
+PKG_SIGN_IDENTITY
+NOTARY_PRIVATE_KEY
+NOTARY_KEY_ID
+NOTARY_ISSUER_ID
+```
+
+`MACOS_CERTIFICATE_P12` should contain the exported signing certificate/private-key material encoded as base64. `NOTARY_PRIVATE_KEY` is the App Store Connect `.p8` key contents.
+
+The release workflow creates a temporary keychain on the runner, imports the signing identities, builds and signs the artifacts, notarizes and staples the DMG/PKG, verifies the result, uploads workflow artifacts, and only then publishes the GitHub Release.
+
+If any public-release credential is missing, the tag workflow stops before publishing. This prevents accidentally shipping an ad-hoc or unnotarized build as an official LumaWall release.
+
+## In-app update integrity
+
+LumaWall's updater downloads the published `SHA256SUMS.txt` beside the DMG/PKG and verifies the selected installer before opening it.
+
+Because notarization stapling changes the installer bytes, the release workflow always regenerates checksums after stapling. The checksum consumed by the app therefore matches the exact artifact users download.
 
 ## Wallpaper file association
 
