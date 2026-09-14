@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 final class CrashQuarantineService {
   private let defaults: UserDefaults
-  private let crashThreshold: Int
+  let crashThreshold: Int
 
   private enum Keys {
     static let cleanShutdown = "stability.cleanShutdown"
@@ -12,8 +12,8 @@ final class CrashQuarantineService {
     static let quarantinedIDs = "stability.quarantinedIDs"
   }
 
-  let previousLaunchWasClean: Bool
-  let suspectedWallpaperIDs: Set<UUID>
+  private(set) var previousLaunchWasClean: Bool
+  private(set) var suspectedWallpaperIDs: Set<UUID>
 
   init(
     defaults: UserDefaults = .standard,
@@ -102,6 +102,8 @@ final class CrashQuarantineService {
     defaults.removeObject(forKey: Keys.crashCounts)
     defaults.removeObject(forKey: Keys.quarantinedIDs)
     defaults.removeObject(forKey: Keys.activeWallpaperIDs)
+    previousLaunchWasClean = true
+    suspectedWallpaperIDs = []
   }
 
   func markCleanShutdown() {
@@ -113,13 +115,13 @@ final class CrashQuarantineService {
     Self.loadCrashCounts(from: defaults)
   }
 
-  nonisolated private static func loadIDs(
+  private static func loadIDs(
     _ values: [String]?
   ) -> Set<UUID> {
     Set(values?.compactMap(UUID.init(uuidString:)) ?? [])
   }
 
-  nonisolated private static func saveIDs(
+  private static func saveIDs(
     _ ids: Set<UUID>,
     key: String,
     to defaults: UserDefaults
@@ -130,7 +132,7 @@ final class CrashQuarantineService {
     )
   }
 
-  nonisolated private static func loadCrashCounts(
+  private static func loadCrashCounts(
     from defaults: UserDefaults
   ) -> [UUID: Int] {
     guard
@@ -147,7 +149,7 @@ final class CrashQuarantineService {
     }
   }
 
-  nonisolated private static func saveCrashCounts(
+  private static func saveCrashCounts(
     _ counts: [UUID: Int],
     to defaults: UserDefaults
   ) {
