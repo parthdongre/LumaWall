@@ -68,9 +68,16 @@ struct LumaWallApp: App {
       }
     }
 
-    MenuBarExtra("LumaWall", systemImage: "sparkles.rectangle.stack") {
+    MenuBarExtra {
       MenuBarView()
         .environmentObject(model)
+    } label: {
+      Label(
+        "LumaWall",
+        systemImage: model.updater.updateAvailable
+          ? "arrow.down.circle.fill"
+          : "sparkles.rectangle.stack"
+      )
     }
     .menuBarExtraStyle(.window)
 
