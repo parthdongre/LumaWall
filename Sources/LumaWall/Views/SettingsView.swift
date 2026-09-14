@@ -535,7 +535,9 @@ struct SettingsView: View {
               HStack {
                 Text(wallpaper.name)
                 Spacer()
-                Text("\(model.quarantine.crashCount(for: wallpaper.id)) / 3")
+                Text(
+                  "\(model.quarantine.crashCount(for: wallpaper.id)) / \(model.quarantine.crashThreshold)"
+                )
                   .font(.caption.monospacedDigit())
                   .foregroundStyle(.secondary)
               }
