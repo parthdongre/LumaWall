@@ -58,9 +58,10 @@ struct OnboardingView: View {
 
   private var welcome: some View {
     VStack(spacing: 22) {
-      Image(systemName: "sparkles.rectangle.stack.fill")
-        .font(.system(size: 78))
-        .symbolRenderingMode(.hierarchical)
+      Image(nsImage: NSApp.applicationIconImage)
+        .resizable()
+        .interpolation(.high)
+        .frame(width: 92, height: 92)
 
       Text("Welcome to LumaWall")
         .font(.system(size: 34, weight: .bold))
