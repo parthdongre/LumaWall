@@ -280,3 +280,12 @@ The Library now accepts Finder file drops directly. SwiftUI's typed URL drop des
 Import entry points now share a small WallpaperImportMenu view. It exposes normal wallpaper import, the existing Wallpaper Engine project importer, and Creator Studio without duplicating separate buttons across ContentView and the Library toolbar.
 
 A new `scripts/doctor.sh` preflight checks the exact toolchain pieces LumaWall needs: macOS 14+, a full Xcode developer directory, xcodebuild, Swift, the macOS SDK and `metal`. Make targets for run/build/test/package/install depend on this check. This intentionally does not try to hide a Command Line Tools-only setup because SwiftUI/AppKit builds and runtime Metal shader work require the complete Apple developer toolchain; instead it fails before opaque Swift macro or `metal` spawn errors.
+
+
+## Public-beta update hardening
+
+The updater now treats release integrity as part of the product boundary rather than trusting a downloaded installer solely because it came from an HTTPS URL. Release discovery still uses GitHub Releases, but LumaWall also looks for the workflow-generated `SHA256SUMS.txt` asset. A DMG or PKG is opened only after its exact release filename is found in that manifest and its locally computed SHA-256 digest matches.
+
+Hashing is performed in 1 MB chunks on a detached utility task so large installer images are not loaded fully into memory and do not block the SwiftUI main actor. If the checksum manifest is missing, the installer entry is missing, or verification fails, LumaWall refuses to open the downloaded installer automatically.
+
+Automatic update checks are intentionally conservative: enabled by default, no more than once every 24 hours, and user-toggleable from Settings. Failed network checks are not recorded as successful checks, allowing a later launch to retry instead of suppressing checks for a full day.
