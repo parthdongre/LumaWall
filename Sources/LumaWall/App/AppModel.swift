@@ -1296,8 +1296,15 @@ final class AppModel: ObservableObject {
           self.systemAudioCaptureRunning = true
         } catch {
           self.systemAudioCaptureRunning = false
-          self.systemAudioEnabled = false
-          self.show(error)
+
+          let stillWantsCapture =
+            self.systemAudioEnabled
+            && !self.suspension.isSuspended
+
+          if stillWantsCapture {
+            self.systemAudioEnabled = false
+            self.show(error)
+          }
         }
       } else {
         await self.audio.stop()
