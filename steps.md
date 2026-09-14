@@ -367,3 +367,12 @@ Diagnostics exposes whether rendering is system-suspended and lists every active
 The primary packaging job remains on macOS 15 because it is a stable baseline for the minimum supported macOS family and exercises the full app/DMG/PKG smoke path. A second `macos-26` job now runs the environment doctor, debug build, full test suite, and release build against the current Tahoe-generation GitHub runner.
 
 This compatibility lane is intentionally source/build focused rather than duplicating the expensive packaging screenshots and DMG layout steps. It catches Swift/Xcode SDK changes on the same macOS generation as current development machines while the macOS 15 lane continues to validate distributable artifacts.
+
+
+## Explicit Screen & System Audio permission state
+
+Audio-reactive wallpapers now use a dedicated ScreenCapturePermissionService around Core Graphics' public screen-capture preflight/request APIs. The service is injected into AppModel rather than hidden inside ScreenCaptureKit startup so the UI can show permission state before capture fails.
+
+Settings → Audio displays whether Screen & System Audio Recording access is currently granted, can explicitly request access, and can refresh the status. LumaWall also refreshes permission state whenever the app becomes active again, which covers returning from System Settings. If access is revoked while system-audio reaction is enabled, LumaWall immediately disables the feature and serializes a capture stop instead of waiting for a later stream error.
+
+The permission service takes injectable preflight/request closures. Regression tests cover initial authorization, external permission changes, successful requests, denied requests, and the case where the request return value is false but a subsequent preflight already reflects a grant.
