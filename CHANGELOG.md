@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Switched the control surface to a single native macOS window while keeping the wallpaper engine alive when that window closes.
+- Stopped ordinary app activation from forcibly raising the main window, improving menu-bar-only use.
+- Added menu-bar access to Settings and verified update downloads, with an update-available status icon.
+- Added a repository-level VERSION source used by packaging and CI, plus a regression test that keeps the Swift fallback version in sync.
+- Tagged releases now reject a version that does not match the repository VERSION file.
 - Added packaged-app installation detection so copies launched from a DMG or Downloads guide users into Applications.
 - Added installation status to Settings and first-run onboarding without affecting SwiftPM development runs.
 - Added Developer ID Application and Developer ID Installer support to the packaging pipeline.
