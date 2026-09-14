@@ -52,7 +52,7 @@ struct OnboardingView: View {
       }
       .padding(18)
     }
-    .frame(width: 720, height: 500)
+    .frame(width: 720, height: 560)
     .interactiveDismissDisabled()
   }
 
