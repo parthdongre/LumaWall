@@ -59,6 +59,7 @@ final class AppModel: ObservableObject {
   let lockScreen = LockScreenSnapshotService()
   let discover = DiscoverCatalogService()
   let livePreview = LivePreviewCoordinator()
+  let installationLocation = AppInstallationLocation.current
   let library: WallpaperLibrary
 
   private var cancellables = Set<AnyCancellable>()
@@ -641,6 +642,14 @@ final class AppModel: ObservableObject {
   func reopenOnboarding() {
     onboardingPage = 0
     showOnboarding = true
+  }
+
+  func openApplicationsFolder() {
+    installationLocation.openApplicationsFolder()
+  }
+
+  func revealInstalledAppLocation() {
+    installationLocation.revealCurrentApp()
   }
 
   func checkForUpdates() {
