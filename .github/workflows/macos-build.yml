@@ -15,6 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve version
+        id: version
+        run: echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
       - name: Swift version
         run: swift --version
 
@@ -61,7 +65,7 @@ jobs:
       - name: Package installable macOS artifacts
         if: github.event_name == 'push'
         env:
-          VERSION: 0.4.0
+          VERSION: ${{ steps.version.outputs.version }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           chmod +x scripts/package-macos.sh
@@ -70,7 +74,7 @@ jobs:
       - name: Verify packaged release artifacts
         if: github.event_name == 'push'
         env:
-          VERSION: 0.4.0
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           chmod +x scripts/verify-release.sh
           ./scripts/verify-release.sh
@@ -80,7 +84,7 @@ jobs:
         run: |
           VERIFY_MOUNT="$RUNNER_TEMP/lumawall-dmg-verify"
           mkdir -p "$VERIFY_MOUNT"
-          hdiutil attach "$PWD/dist/LumaWall-0.4.0.dmg" -readonly -noverify -noautoopen -mountpoint "$VERIFY_MOUNT" >/dev/null
+          hdiutil attach "$PWD/dist/LumaWall-${{ steps.version.outputs.version }}.dmg" -readonly -noverify -noautoopen -mountpoint "$VERIFY_MOUNT" >/dev/null
 
           test -d "$VERIFY_MOUNT/LumaWall.app"
           test -L "$VERIFY_MOUNT/Applications"
@@ -110,9 +114,9 @@ jobs:
           name: LumaWall-macOS-${{ github.sha }}
           path: |
             dist/LumaWall.app
-            dist/LumaWall-0.4.0-macOS.zip
-            dist/LumaWall-0.4.0.dmg
-            dist/LumaWall-0.4.0.pkg
+            dist/LumaWall-${{ steps.version.outputs.version }}-macOS.zip
+            dist/LumaWall-${{ steps.version.outputs.version }}.dmg
+            dist/LumaWall-${{ steps.version.outputs.version }}.pkg
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
