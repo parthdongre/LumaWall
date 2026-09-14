@@ -117,13 +117,15 @@ PLIST
 
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 
-SIGN_IDENTITY="${SIGN_IDENTITY:--}"
-if [[ "$SIGN_IDENTITY" == "-" ]]; then
+APP_SIGN_IDENTITY="${APP_SIGN_IDENTITY:-${SIGN_IDENTITY:--}}"
+PKG_SIGN_IDENTITY="${PKG_SIGN_IDENTITY:-}"
+
+if [[ "$APP_SIGN_IDENTITY" == "-" ]]; then
   echo "==> Applying ad-hoc code signature"
   codesign --force --deep --sign - "$APP"
 else
-  echo "==> Signing with $SIGN_IDENTITY"
-  codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+  echo "==> Signing app with $APP_SIGN_IDENTITY"
+  codesign --force --deep --options runtime --timestamp --sign "$APP_SIGN_IDENTITY" "$APP"
 fi
 
 codesign --verify --deep --strict "$APP"
@@ -216,8 +218,26 @@ hdiutil convert \
 
 rm -f "$RW_DMG"
 
+if [[ "$APP_SIGN_IDENTITY" != "-" ]]; then
+  echo "==> Signing DMG with $APP_SIGN_IDENTITY"
+  codesign --force --timestamp --sign "$APP_SIGN_IDENTITY" "$DMG"
+  codesign --verify --verbose=2 "$DMG"
+fi
+
 echo "==> Creating PKG"
-pkgbuild   --component "$APP"   --install-location /Applications   --identifier "$BUNDLE_ID"   --version "$VERSION"   "$PKG" >/dev/null
+PKG_ARGS=(
+  --component "$APP"
+  --install-location /Applications
+  --identifier "$BUNDLE_ID"
+  --version "$VERSION"
+)
+
+if [[ -n "$PKG_SIGN_IDENTITY" ]]; then
+  echo "==> Signing PKG with $PKG_SIGN_IDENTITY"
+  PKG_ARGS+=(--sign "$PKG_SIGN_IDENTITY")
+fi
+
+pkgbuild "${PKG_ARGS[@]}" "$PKG" >/dev/null
 
 (
   cd "$DIST"
