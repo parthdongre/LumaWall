@@ -197,6 +197,19 @@ struct DiagnosticsView: View {
           }
         }
 
+        GroupBox("Privacy permissions") {
+          VStack(alignment: .leading, spacing: 8) {
+            diagnosticRow(
+              "Screen & System Audio Recording",
+              model.screenCapturePermission.isGranted ? "Granted" : "Not granted"
+            )
+            diagnosticRow(
+              "System audio reaction",
+              model.systemAudioEnabled ? "Enabled" : "Disabled"
+            )
+          }
+        }
+
         GroupBox("System suspension") {
           VStack(alignment: .leading, spacing: 8) {
             diagnosticRow(
