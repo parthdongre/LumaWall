@@ -37,7 +37,7 @@ func crashQuarantineTracksOnlyWallpapersActiveAtCrash() {
   let service = CrashQuarantineService(defaults: defaults)
 
   #expect(!service.previousLaunchWasClean)
-  #expect(service.suspectedWallpaperIDs == [active])
+  #expect(service.suspectedWallpaperIDs == Set([active]))
   #expect(service.crashCount(for: active) == 1)
   #expect(!service.isQuarantined(active))
 }
