@@ -57,6 +57,7 @@ struct WallpaperTransitionSettings: Codable, Hashable, Sendable {
 
 struct DisplayPerformanceProfile: Codable, Hashable, Identifiable, Sendable {
   var displayID: UInt32
+  var persistentDisplayID: String? = nil
   var targetFPS: Int
   var renderScale: Double
   var maximumResolution: Bool
