@@ -91,6 +91,8 @@ jobs:
           test -f "$VERIFY_MOUNT/.background/background.png"
           test -f "$VERIFY_MOUNT/.DS_Store"
           test -d "$VERIFY_MOUNT/LumaWall.app/Contents/Resources/LumaWall_LumaWall.bundle"
+          test -f "$VERIFY_MOUNT/LumaWall.app/Contents/Resources/LumaWall.icns"
+          test "$(plutil -extract CFBundleIconFile raw "$VERIFY_MOUNT/LumaWall.app/Contents/Info.plist")" = "LumaWall.icns"
 
           hdiutil detach "$VERIFY_MOUNT" -quiet
 
