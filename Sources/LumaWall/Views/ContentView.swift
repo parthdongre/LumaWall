@@ -86,6 +86,13 @@ struct ContentView: View {
         )
       }
     }
+    .safeAreaInset(edge: .top) {
+      if model.installationLocation.shouldRecommendInstallation {
+        InstallationRecommendationBanner()
+          .padding(.horizontal, 14)
+          .padding(.top, 10)
+      }
+    }
     .safeAreaInset(edge: .bottom) {
       if let message = model.statusMessage {
         HStack(spacing: 8) {
