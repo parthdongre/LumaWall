@@ -1104,6 +1104,7 @@ final class AppModel: ObservableObject {
 
   func resetStabilityHistory() {
     quarantine.resetHistory()
+    quarantine.recordActiveWallpaperIDs(activeWallpaperIDs)
     statusMessage = "Crash quarantine history cleared."
   }
 
