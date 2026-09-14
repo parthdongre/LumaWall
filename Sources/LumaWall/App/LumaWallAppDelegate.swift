@@ -10,16 +10,20 @@ final class LumaWallAppDelegate: NSObject, NSApplicationDelegate {
     NSApp.setActivationPolicy(.regular)
   }
 
-  func applicationDidBecomeActive(_ notification: Notification) {
-    Self.bringControlWindowForward()
-  }
-
   func applicationShouldHandleReopen(
     _ sender: NSApplication,
     hasVisibleWindows flag: Bool
   ) -> Bool {
-    Self.bringControlWindowForward()
+    if flag {
+      Self.bringControlWindowForward()
+    }
     return true
+  }
+
+  func applicationShouldTerminateAfterLastWindowClosed(
+    _ sender: NSApplication
+  ) -> Bool {
+    false
   }
 
   func application(_ application: NSApplication, open urls: [URL]) {
