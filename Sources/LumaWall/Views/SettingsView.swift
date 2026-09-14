@@ -53,6 +53,37 @@ struct SettingsView: View {
         )
       }
 
+      Section("Installation") {
+        if model.installationLocation.shouldRecommendInstallation {
+          Label(
+            model.installationLocation.recommendationTitle,
+            systemImage: "exclamationmark.triangle.fill"
+          )
+
+          Text(model.installationLocation.recommendationMessage)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+          HStack {
+            Button("Show LumaWall") {
+              model.revealInstalledAppLocation()
+            }
+
+            Button("Open Applications") {
+              model.openApplicationsFolder()
+            }
+          }
+        } else if model.installationLocation.isAppBundle {
+          Label("LumaWall is installed in Applications", systemImage: "checkmark.circle.fill")
+            .foregroundStyle(.green)
+        } else {
+          Label("Development build", systemImage: "hammer")
+          Text("Install-location guidance is only shown for packaged LumaWall.app builds.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+
       Section("Library") {
         Button("Open Wallpaper Folder") {
           model.openLibraryFolder()
