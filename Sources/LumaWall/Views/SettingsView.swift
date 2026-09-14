@@ -401,6 +401,18 @@ struct SettingsView: View {
           .disabled(model.updater.isChecking)
         }
 
+        Toggle(
+          "Automatically check for updates",
+          isOn: $model.updater.automaticallyChecksForUpdates
+        )
+
+        if let lastCheckedAt = model.updater.lastCheckedAt {
+          LabeledContent(
+            "Last checked",
+            value: lastCheckedAt.formatted(date: .abbreviated, time: .shortened)
+          )
+        }
+
         if let latest = model.updater.latestVersion {
           LabeledContent("Latest release", value: latest)
         }
@@ -424,7 +436,7 @@ struct SettingsView: View {
 
       Section("How updates work") {
         Text(
-          "LumaWall checks the official GitHub Releases feed. When an update is available, the app downloads the macOS DMG or PKG to Downloads and opens it for installation."
+          "LumaWall checks the official GitHub Releases feed. Automatic checks run at most once per day. Before an update installer is opened, LumaWall verifies it against the release's SHA-256 checksum."
         )
         .font(.caption)
         .foregroundStyle(.secondary)
