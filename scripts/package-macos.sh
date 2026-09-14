@@ -37,6 +37,13 @@ else
   exit 1
 fi
 
+echo "==> Generating app icon"
+ICON_WORK="$(mktemp -d)"
+ICONSET="$ICON_WORK/LumaWall.iconset"
+swift "$ROOT/scripts/make-app-icon.swift" "$ICONSET"
+iconutil -c icns "$ICONSET" -o "$RESOURCES/LumaWall.icns"
+rm -rf "$ICON_WORK"
+
 cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -52,6 +59,8 @@ cat > "$CONTENTS/Info.plist" <<PLIST
   <string>$BUNDLE_ID</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
+  <key>CFBundleIconFile</key>
+  <string>LumaWall.icns</string>
   <key>CFBundleName</key>
   <string>LumaWall</string>
   <key>CFBundlePackageType</key>
