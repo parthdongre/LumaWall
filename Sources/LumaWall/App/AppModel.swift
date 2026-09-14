@@ -55,6 +55,7 @@ final class AppModel: ObservableObject {
   let launchAtLogin = LaunchAtLoginController()
   let updater = UpdateService()
   let power = PowerSourceMonitor()
+  let screenCapturePermission = ScreenCapturePermissionService()
   let quarantine = CrashQuarantineService()
   let suspension = SystemSuspensionCoordinator()
   let lockScreen = LockScreenSnapshotService()
@@ -311,6 +312,9 @@ final class AppModel: ObservableObject {
 
     power.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
+    screenCapturePermission.objectWillChange.sink { [weak self] _ in
+      self?.objectWillChange.send()
+    }.store(in: &cancellables)
     discover.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
     livePreview.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
@@ -359,6 +363,16 @@ final class AppModel: ObservableObject {
         }
 
         self.scheduleLockScreenRefresh()
+      }
+    }
+
+    NotificationCenter.default.addObserver(
+      forName: NSApplication.didBecomeActiveNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      Task { @MainActor in
+        self?.screenCapturePermission.refresh()
       }
     }
 
@@ -543,6 +557,7 @@ final class AppModel: ObservableObject {
     Favorites: \(favoriteWallpaperIDs.count)
     Recent: \(recentWallpaperIDs.count)
     System Audio Enabled: \(systemAudioEnabled)
+    Screen & System Audio Permission: \(screenCapturePermission.isGranted ? "Granted" : "Not granted")
 
     Stability
     ---------
@@ -1227,8 +1242,29 @@ final class AppModel: ObservableObject {
   }
 
   func setSystemAudioEnabled(_ enabled: Bool) {
+    if enabled, !screenCapturePermission.isGranted {
+      guard screenCapturePermission.request() else {
+        systemAudioEnabled = false
+        statusMessage =
+          "Screen & System Audio Recording permission is required for audio-reactive wallpapers."
+        return
+      }
+    }
+
     systemAudioEnabled = enabled
     syncSystemAudioCapture()
+  }
+
+  func requestScreenCapturePermission() {
+    let granted = screenCapturePermission.request()
+    statusMessage =
+      granted
+      ? "Screen & System Audio Recording access granted."
+      : "Permission was not granted. You can retry from Settings → Audio."
+  }
+
+  func refreshScreenCapturePermission() {
+    screenCapturePermission.refresh()
   }
 
   private func syncSystemAudioCapture() {
