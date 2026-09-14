@@ -83,14 +83,13 @@ The source has been Swift parser-validated in the development environment. Apple
 The macOS CI build is treated as the source of truth for Apple-framework type checking. Swift 6 marks AppKit/WebKit UI APIs as main-actor isolated, while `Timer` callbacks are sendable/nonisolated closures. Timer callbacks therefore enter `Task { @MainActor in ... }` before touching UI-owned state, and `WebSecurityPolicy` is main-actor isolated because it constructs and mutates WebKit objects. We keep these explicit actor boundaries rather than disabling strict concurrency checking.
 
 
-## Command Line Tools compatibility
+## Xcode, SwiftUI macros, and Metal resources
 
-SwiftPM treats processed `.metal` resources as build-time Metal sources and invokes the standalone `metal` compiler. Many Macs with only Apple Command Line Tools do not include that compiler. LumaWall's Metal renderer already compiles creator shader source at runtime with `MTLDevice.makeLibrary(source:options:)`, so the bundled `Resources` directory is copied verbatim instead of processed. This preserves shader examples while allowing `swift run LumaWall` without requiring the full Xcode app solely for resource compilation.
+LumaWall deliberately copies the bundled `Resources` directory instead of processing it. That prevents SwiftPM from treating bundled `.metal` wallpaper source as a build-time Metal target, so the standalone `metal` command is not required for the current bundled shaders. Creator Metal source is compiled at runtime through `MTLDevice.makeLibrary(source:options:)`.
 
+That resource change does **not** make the complete SwiftUI application buildable with Apple Command Line Tools alone. Current SwiftUI/Swift 6 toolchains use compiler macro plugins such as `SwiftUIMacros.StateMacro`; a CLT-only installation can have `swift` and the macOS SDK while still lacking those host plugins. Full Xcode is therefore a development requirement for the native control app.
 
-## Command Line Tools macro compatibility
-
-A Command Line Tools-only Swift toolchain may provide the macOS SDK frameworks without shipping the separate `SwiftDataMacros` and `SwiftUIMacros` compiler plugins. LumaWall therefore does not require SwiftData macros for its local wallpaper index and does not use `@State` for sidebar selection. Imported wallpaper metadata is stored as Codable JSON under Application Support, and navigation selection lives in `AppModel` as ordinary Combine-published state. This keeps the app runnable with a lightweight CLT installation while preserving the same library behavior.
+The doctor script now separates these two concerns. It rejects CLT-only selection with the SwiftUI macro explanation, performs a real SwiftUI `@State` type-check probe when full Xcode is selected, and treats a missing standalone `metal` binary as a warning rather than an automatic failure.
 
 
 ## Bundled resource lookup after CLT compatibility change
@@ -143,14 +142,14 @@ The app bundle registers the `.wall` document type, and AppKit's application del
 
 The first v0.3 packaging run exposed a macOS code-signing rule: arbitrary files or symlinks at the root of an `.app` bundle are considered unsealed contents. The SwiftPM resource-bundle compatibility symlink was therefore removed.
 
-Packaged builds now keep `LumaWall_LumaWall.bundle` exclusively under `Contents/Resources`, and `WallpaperLibrary` resolves that nested bundle explicitly when `Bundle.main` is an installed app. Development runs still use `Bundle.module`. This preserves Command Line Tools development while producing a standards-compliant signed app bundle.
+Packaged builds now keep `LumaWall_LumaWall.bundle` exclusively under `Contents/Resources`, and `WallpaperLibrary` resolves that nested bundle explicitly when `Bundle.main` is an installed app. Development runs still use `Bundle.module`. This keeps resource lookup consistent between SwiftPM and the standards-compliant signed app bundle.
 
 
 ## App-only macOS user experience
 
 LumaWall is now treated explicitly as a macOS application rather than a CLI-assisted project. Shell scripts and SwiftPM commands remain developer/build infrastructure only; they are not part of the normal user journey.
 
-First launch is handled by a native SwiftUI onboarding sheet backed by `AppModel` state rather than `@State`, preserving compatibility with the lightweight Command Line Tools configuration used during development. The onboarding explains supported wallpaper technologies, performance presets, optional audio permissions, and recovery tools.
+First launch is handled by a native SwiftUI onboarding sheet backed by `AppModel` state. The onboarding explains supported wallpaper technologies, performance presets, optional audio permissions, installation location, and recovery tools.
 
 Settings now exposes all operational controls through macOS UI tabs: General, Performance, Audio, Updates, Recovery and About. The previous user-facing Terminal Safe Mode instruction was removed; users can request Safe Mode for the next launch from the Recovery tab.
 
@@ -279,7 +278,9 @@ The Library now accepts Finder file drops directly. SwiftUI's typed URL drop des
 
 Import entry points now share a small WallpaperImportMenu view. It exposes normal wallpaper import, the existing Wallpaper Engine project importer, and Creator Studio without duplicating separate buttons across ContentView and the Library toolbar.
 
-A new `scripts/doctor.sh` preflight checks the exact toolchain pieces LumaWall needs: macOS 14+, a full Xcode developer directory, xcodebuild, Swift, the macOS SDK and `metal`. Make targets for run/build/test/package/install depend on this check. This intentionally does not try to hide a Command Line Tools-only setup because SwiftUI/AppKit builds and runtime Metal shader work require the complete Apple developer toolchain; instead it fails before opaque Swift macro or `metal` spawn errors.
+A new `scripts/doctor.sh` preflight checks the exact toolchain pieces LumaWall needs: macOS 14+, full Xcode selection, xcodebuild, Swift, the macOS SDK, SwiftPM manifest resolution, and a real SwiftUI macro type-check probe. Make targets for run/build/test/package/install depend on this check. A missing standalone `metal` command is only a warning for the current source tree because bundled shader resources are copied rather than compiled at build time.
+
+`make repair` clears stale SwiftPM state and resets the package before rerunning the doctor. This is specifically useful after changing resource-processing rules or switching Xcode toolchains, because an old `.build` graph can keep surfacing obsolete `metal` or macro failures even after the source has been corrected.
 
 
 ## Public-beta update hardening
@@ -337,3 +338,14 @@ The distributable app now generates a deterministic Retina iconset during packag
 package-macos.sh converts the generated iconset into LumaWall.icns, embeds it under Contents/Resources, and declares it through CFBundleIconFile. Release verification and mounted-DMG CI both assert that the icon exists and that Info.plist points to it.
 
 Onboarding and About read NSApplication's actual applicationIconImage, so the same packaged identity is reused inside the app instead of duplicating a separate branding asset path.
+
+
+## Public-beta crash attribution and recovery
+
+Crash quarantine now records exactly the wallpaper IDs that are active at any moment. Stopping all wallpapers or removing a wallpaper from a display updates that persisted set immediately, preventing a later unrelated crash from being falsely attributed to a wallpaper that is no longer rendering.
+
+On startup, an unclean previous launch increments stability strikes only for the wallpaper IDs that were actually recorded as active. After the configured threshold, those wallpapers are quarantined and skipped during assignment restoration. Once restore completes, LumaWall rewrites the saved assignment snapshot from the renderers that were actually restored, so skipped/quarantined wallpaper IDs cannot linger into another crash cycle.
+
+Recovery and Diagnostics now expose whether the previous launch was clean, the suspected wallpaper set, current strike counts, and quarantined wallpapers. Resetting stability history clears persisted counts/quarantine state but immediately re-records currently active wallpaper IDs so future crash attribution continues correctly.
+
+The crash service accepts an isolated UserDefaults suite for testing. Regression coverage exercises clean first launch, unclean attribution, quarantine threshold, stop-before-crash false-positive prevention, stable-run strike reset, re-enable behavior, clean shutdown, and full history reset.
