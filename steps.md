@@ -289,3 +289,16 @@ The updater now treats release integrity as part of the product boundary rather 
 Hashing is performed in 1 MB chunks on a detached utility task so large installer images are not loaded fully into memory and do not block the SwiftUI main actor. If the checksum manifest is missing, the installer entry is missing, or verification fails, LumaWall refuses to open the downloaded installer automatically.
 
 Automatic update checks are intentionally conservative: enabled by default, no more than once every 24 hours, and user-toggleable from Settings. Failed network checks are not recorded as successful checks, allowing a later launch to retry instead of suppressing checks for a full day.
+
+
+## Trusted public macOS releases
+
+Development packaging and public distribution now have intentionally different trust levels. Normal CI still uses an ad-hoc signature because its purpose is compile, package, DMG-layout, and launch regression testing. A version tag is treated as a public distribution event and is not allowed to publish unless Developer ID and notarization credentials are present.
+
+The app and DMG use the Developer ID Application identity while the PKG uses Developer ID Installer. Keeping those identities separate matches Apple's distribution model instead of overloading a single signing variable.
+
+Notarization is a second script rather than being hidden inside packaging. This preserves reproducible local development builds and makes the trust boundary explicit: package first, notarize/staple second, verify third, publish last.
+
+Stapling changes DMG/PKG bytes, so the checksum manifest is regenerated only after notarization completes. This ordering is important because LumaWall's in-app updater now verifies the exact published installer against SHA256SUMS.txt before opening it.
+
+The release verifier has two levels. Development CI checks the app signature and checksum consistency. Public tag builds additionally require Developer ID identities, stapled tickets, and successful Gatekeeper assessment. A tagged release therefore fails closed instead of silently falling back to an ad-hoc build.
