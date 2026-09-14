@@ -2,8 +2,8 @@ import Foundation
 
 @MainActor
 final class CrashQuarantineService {
-  private let defaults = UserDefaults.standard
-  private let crashThreshold = 3
+  private let defaults: UserDefaults
+  private let crashThreshold: Int
 
   private enum Keys {
     static let cleanShutdown = "stability.cleanShutdown"
@@ -12,33 +12,56 @@ final class CrashQuarantineService {
     static let quarantinedIDs = "stability.quarantinedIDs"
   }
 
-  init() {
+  let previousLaunchWasClean: Bool
+  let suspectedWallpaperIDs: Set<UUID>
+
+  init(
+    defaults: UserDefaults = .standard,
+    crashThreshold: Int = 3
+  ) {
+    self.defaults = defaults
+    self.crashThreshold = max(1, crashThreshold)
+
     let previousWasClean =
       defaults.object(forKey: Keys.cleanShutdown) as? Bool ?? true
+    previousLaunchWasClean = previousWasClean
+
+    let previousIDs = Self.loadIDs(
+      defaults.stringArray(forKey: Keys.activeWallpaperIDs)
+    )
+    suspectedWallpaperIDs = previousWasClean ? [] : previousIDs
 
     if !previousWasClean {
-      var counts = crashCounts
-      for id in previouslyActiveWallpaperIDs {
+      var counts = Self.loadCrashCounts(from: defaults)
+      for id in previousIDs {
         counts[id, default: 0] += 1
       }
-      saveCrashCounts(counts)
+      Self.saveCrashCounts(counts, to: defaults)
 
-      var quarantined = quarantinedIDs
-      for (id, count) in counts where count >= crashThreshold {
+      var quarantined = Self.loadIDs(
+        defaults.stringArray(forKey: Keys.quarantinedIDs)
+      )
+      for (id, count) in counts where count >= self.crashThreshold {
         quarantined.insert(id)
       }
-      saveQuarantinedIDs(quarantined)
+      Self.saveIDs(
+        quarantined,
+        key: Keys.quarantinedIDs,
+        to: defaults
+      )
     }
 
     defaults.set(false, forKey: Keys.cleanShutdown)
   }
 
   var quarantinedIDs: Set<UUID> {
-    Set(
-      defaults.stringArray(forKey: Keys.quarantinedIDs)?
-        .compactMap(UUID.init(uuidString:))
-        ?? []
+    Self.loadIDs(
+      defaults.stringArray(forKey: Keys.quarantinedIDs)
     )
+  }
+
+  func crashCount(for id: UUID) -> Int {
+    crashCounts[id, default: 0]
   }
 
   func isQuarantined(_ id: UUID) -> Bool {
@@ -46,9 +69,10 @@ final class CrashQuarantineService {
   }
 
   func recordActiveWallpaperIDs(_ ids: Set<UUID>) {
-    defaults.set(
-      ids.map(\.uuidString).sorted(),
-      forKey: Keys.activeWallpaperIDs
+    Self.saveIDs(
+      ids,
+      key: Keys.activeWallpaperIDs,
+      to: defaults
     )
   }
 
@@ -57,17 +81,27 @@ final class CrashQuarantineService {
     for id in ids {
       counts[id] = 0
     }
-    saveCrashCounts(counts)
+    Self.saveCrashCounts(counts, to: defaults)
   }
 
   func allowAgain(_ id: UUID) {
     var quarantined = quarantinedIDs
     quarantined.remove(id)
-    saveQuarantinedIDs(quarantined)
+    Self.saveIDs(
+      quarantined,
+      key: Keys.quarantinedIDs,
+      to: defaults
+    )
 
     var counts = crashCounts
     counts[id] = 0
-    saveCrashCounts(counts)
+    Self.saveCrashCounts(counts, to: defaults)
+  }
+
+  func resetHistory() {
+    defaults.removeObject(forKey: Keys.crashCounts)
+    defaults.removeObject(forKey: Keys.quarantinedIDs)
+    defaults.removeObject(forKey: Keys.activeWallpaperIDs)
   }
 
   func markCleanShutdown() {
@@ -75,15 +109,30 @@ final class CrashQuarantineService {
     recordActiveWallpaperIDs([])
   }
 
-  private var previouslyActiveWallpaperIDs: Set<UUID> {
-    Set(
-      defaults.stringArray(forKey: Keys.activeWallpaperIDs)?
-        .compactMap(UUID.init(uuidString:))
-        ?? []
+  private var crashCounts: [UUID: Int] {
+    Self.loadCrashCounts(from: defaults)
+  }
+
+  nonisolated private static func loadIDs(
+    _ values: [String]?
+  ) -> Set<UUID> {
+    Set(values?.compactMap(UUID.init(uuidString:)) ?? [])
+  }
+
+  nonisolated private static func saveIDs(
+    _ ids: Set<UUID>,
+    key: String,
+    to defaults: UserDefaults
+  ) {
+    defaults.set(
+      ids.map(\.uuidString).sorted(),
+      forKey: key
     )
   }
 
-  private var crashCounts: [UUID: Int] {
+  nonisolated private static func loadCrashCounts(
+    from defaults: UserDefaults
+  ) -> [UUID: Int] {
     guard
       let dictionary =
         defaults.dictionary(forKey: Keys.crashCounts) as? [String: Int]
@@ -98,7 +147,10 @@ final class CrashQuarantineService {
     }
   }
 
-  private func saveCrashCounts(_ counts: [UUID: Int]) {
+  nonisolated private static func saveCrashCounts(
+    _ counts: [UUID: Int],
+    to defaults: UserDefaults
+  ) {
     defaults.set(
       Dictionary(
         uniqueKeysWithValues: counts.map {
@@ -106,13 +158,6 @@ final class CrashQuarantineService {
         }
       ),
       forKey: Keys.crashCounts
-    )
-  }
-
-  private func saveQuarantinedIDs(_ ids: Set<UUID>) {
-    defaults.set(
-      ids.map(\.uuidString).sorted(),
-      forKey: Keys.quarantinedIDs
     )
   }
 }
