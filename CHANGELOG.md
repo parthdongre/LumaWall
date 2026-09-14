@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added packaged-app installation detection so copies launched from a DMG or Downloads guide users into Applications.
+- Added installation status to Settings and first-run onboarding without affecting SwiftPM development runs.
 - Added Developer ID Application and Developer ID Installer support to the packaging pipeline.
 - Added notarization and stapling automation for public DMG/PKG releases.
 - Public tag releases now fail closed when signing or notarization credentials are missing.
