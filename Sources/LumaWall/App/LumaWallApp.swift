@@ -6,7 +6,7 @@ struct LumaWallApp: App {
   @StateObject private var model = AppModel()
 
   var body: some Scene {
-    WindowGroup("LumaWall", id: "main") {
+    Window("LumaWall", id: "main") {
       ContentView()
         .environmentObject(model)
         .frame(minWidth: 980, minHeight: 640)
@@ -20,6 +20,8 @@ struct LumaWallApp: App {
             .environmentObject(model)
         }
     }
+    .defaultSize(width: 1180, height: 760)
+    .windowResizability(.contentMinSize)
     .commands {
       CommandMenu("Wallpaper") {
         Button(model.isPaused ? "Resume Wallpapers" : "Pause Wallpapers") {
