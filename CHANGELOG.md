@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a generated Retina macOS app icon embedded into packaged builds and verified in CI/DMG validation.
+- Onboarding and About now use the real application icon instead of a generic system symbol.
 - Switched the control surface to a single native macOS window while keeping the wallpaper engine alive when that window closes.
 - Stopped ordinary app activation from forcibly raising the main window, improving menu-bar-only use.
 - Added menu-bar access to Settings and verified update downloads, with an update-available status icon.
