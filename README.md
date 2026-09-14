@@ -123,10 +123,10 @@ DISPLAY POLICY    independent per monitor
 ### Requirements
 
 - macOS **14 Sonoma or newer**
-- Apple **Command Line Tools** or full Xcode, with Swift 6
+- full **Xcode** with Swift 6
 - Git
 
-Full Xcode is optional for normal `make run`, `make build`, and `make test`. Public Developer ID signing/notarization still uses the full Apple release toolchain.
+Command Line Tools alone are not sufficient for the app build on current Swift toolchains because modern SwiftUI relies on compiler macro plugins such as `SwiftUIMacros.StateMacro`, which ship with full Xcode.
 
 ```bash
 git clone https://github.com/parthdongre/LumaWall.git
@@ -178,19 +178,32 @@ Run the built-in environment check first:
 make doctor
 ```
 
-LumaWall deliberately supports Apple Command Line Tools for source development. The repository copies bundled `.metal` files as resources instead of asking SwiftPM to compile them at build time, and Metal wallpaper source is compiled at runtime by the Metal framework.
+There are two different toolchain issues that can look similar:
 
-If you previously saw this error on an older checkout, update the repository and clear SwiftPM build products:
+1. **Command Line Tools only** — this cannot compile the current SwiftUI app because the SwiftUI macro plugins are part of full Xcode.
+2. **Standalone `metal` command missing** — current LumaWall does not require that command for its bundled shader resources because the Resources directory is copied verbatim and creator Metal source is compiled at runtime.
+
+For the first case, install full Xcode and select it:
+
+```bash
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+xcodebuild -runFirstLaunch
+```
+
+Then clear any stale SwiftPM build plan left from the older Metal-resource configuration:
 
 ```bash
 git pull origin main
-rm -rf .build
-swift package reset
+make repair
 make doctor
 make run
 ```
 
-With Command Line Tools selected, `make doctor` may warn that the standalone `metal` command and `xcodebuild` are unavailable. Those warnings are expected and are no longer fatal for normal development.
+If a future target genuinely compiles `.metal` files at build time with Xcode 26+, the standalone Metal toolchain can be installed with:
+
+```bash
+xcodebuild -downloadComponent MetalToolchain
+```
 
 </details>
 
@@ -322,7 +335,7 @@ Sources/LumaWall/
 ## ⌘ Development
 
 ```bash
-make doctor    # verify SwiftPM, Swift and the macOS SDK; CLT-only is supported
+make doctor    # verify full Xcode, SwiftUI macros, SwiftPM and the macOS SDK
 make run       # launch
 make build     # compile
 make test      # test
