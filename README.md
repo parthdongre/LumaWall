@@ -123,8 +123,10 @@ DISPLAY POLICY    independent per monitor
 ### Requirements
 
 - macOS **14 Sonoma or newer**
-- full **Xcode** installation with Swift 6 and Metal tooling
+- Apple **Command Line Tools** or full Xcode, with Swift 6
 - Git
+
+Full Xcode is optional for normal `make run`, `make build`, and `make test`. Public Developer ID signing/notarization still uses the full Apple release toolchain.
 
 ```bash
 git clone https://github.com/parthdongre/LumaWall.git
@@ -170,21 +172,25 @@ make install
 
 <br/>
 
-LumaWall's SwiftUI/AppKit build and runtime Metal shader compiler require the full Xcode developer toolchain. Run the built-in environment check first:
+Run the built-in environment check first:
 
 ```bash
 make doctor
 ```
 
-If Command Line Tools are selected, switch to full Xcode:
+LumaWall deliberately supports Apple Command Line Tools for source development. The repository copies bundled `.metal` files as resources instead of asking SwiftPM to compile them at build time, and Metal wallpaper source is compiled at runtime by the Metal framework.
+
+If you previously saw this error on an older checkout, update the repository and clear SwiftPM build products:
 
 ```bash
-sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
-xcodebuild -version
-xcrun --sdk macosx --find metal
+git pull origin main
+rm -rf .build
+swift package reset
+make doctor
+make run
 ```
 
-Then rerun `make doctor` and launch LumaWall.
+With Command Line Tools selected, `make doctor` may warn that the standalone `metal` command and `xcodebuild` are unavailable. Those warnings are expected and are no longer fatal for normal development.
 
 </details>
 
@@ -316,7 +322,7 @@ Sources/LumaWall/
 ## ⌘ Development
 
 ```bash
-make doctor    # verify Xcode, Swift, Metal and macOS SDK
+make doctor    # verify SwiftPM, Swift and the macOS SDK; CLT-only is supported
 make run       # launch
 make build     # compile
 make test      # test
