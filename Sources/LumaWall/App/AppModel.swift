@@ -91,6 +91,8 @@ final class AppModel: ObservableObject {
     static let transitionStyle = "rendering.transitionStyle"
     static let transitionDuration = "rendering.transitionDuration"
     static let displayProfiles = "rendering.displayProfiles"
+    static let displayAssignments = "rendering.displayAssignmentsByUUID"
+    static let legacyDisplayAssignments = "displayAssignments"
     static let fitModes = "rendering.fitModes"
     static let videoSettings = "rendering.videoSettings"
     static let timeDateSettings = "overlay.timeDateSettings"
@@ -340,19 +342,23 @@ final class AppModel: ObservableObject {
     ) { [weak self] _ in
       Task { @MainActor in
         guard let self else { return }
-        let updatedDisplays = DisplayManager.connectedDisplays()
-        self.displays = updatedDisplays
 
-        for display in updatedDisplays where self.displayProfiles[display.id] == nil {
-          self.displayProfiles[display.id] = DisplayPerformanceProfile(
-            displayID: display.id,
-            targetFPS: min(self.targetFPS, display.maximumFPS),
-            renderScale: self.renderScale,
-            maximumResolution: self.maximumResolutionEnabled,
-            fitMode: .fill
-          )
+        let previousPersistentIDs = Set(
+          self.displays.map(\.persistentID)
+        )
+        let updatedDisplays = DisplayManager.connectedDisplays()
+        let newlyConnectedDisplays = updatedDisplays.filter {
+          !previousPersistentIDs.contains($0.persistentID)
         }
 
+        self.displays = updatedDisplays
+        self.displayProfiles = Self.loadDisplayProfiles(
+          from: self.defaults,
+          displays: updatedDisplays,
+          fallbackFPS: self.targetFPS,
+          fallbackScale: self.renderScale,
+          maximumResolution: self.maximumResolutionEnabled
+        )
         self.saveDisplayProfiles()
         self.engine.setDisplayProfiles(self.displayProfiles)
         self.engine.refreshDisplays(updatedDisplays)
@@ -360,6 +366,10 @@ final class AppModel: ObservableObject {
 
         if self.qualityPreset == .automatic {
           self.applyHardwareRecommendation()
+        }
+
+        if !newlyConnectedDisplays.isEmpty {
+          self.restoreAssignments(for: newlyConnectedDisplays)
         }
 
         self.scheduleLockScreenRefresh()
@@ -997,10 +1007,12 @@ final class AppModel: ObservableObject {
   func stopWallpapers(on displayID: CGDirectDisplayID?) {
     if let displayID {
       engine.removeWallpaper(from: displayID)
+      saveAssignments()
     } else {
       engine.stopAll()
+      clearSavedAssignments()
     }
-    saveAssignments()
+
     quarantine.recordActiveWallpaperIDs(activeWallpaperIDs)
     statusMessage = displayID == nil ? "Stopped all wallpapers" : "Stopped wallpaper"
   }
@@ -1008,7 +1020,7 @@ final class AppModel: ObservableObject {
   func stopAllAndClearAssignments() {
     engine.stopAll()
     quarantine.recordActiveWallpaperIDs([])
-    defaults.removeObject(forKey: "displayAssignments")
+    clearSavedAssignments()
     statusMessage = "Stopped all wallpapers and cleared saved display assignments"
   }
 
@@ -1100,6 +1112,7 @@ final class AppModel: ObservableObject {
     displayProfiles[display.id]
       ?? DisplayPerformanceProfile(
         displayID: display.id,
+        persistentDisplayID: display.persistentID,
         targetFPS: min(targetFPS, display.maximumFPS),
         renderScale: renderScale,
         maximumResolution: maximumResolutionEnabled,
@@ -1108,7 +1121,13 @@ final class AppModel: ObservableObject {
   }
 
   func updateDisplayProfile(_ profile: DisplayPerformanceProfile) {
-    displayProfiles[profile.displayID] = profile
+    var updated = profile
+
+    if let display = displays.first(where: { $0.id == profile.displayID }) {
+      updated.persistentDisplayID = display.persistentID
+    }
+
+    displayProfiles[updated.displayID] = updated
     saveDisplayProfiles()
     engine.setDisplayProfiles(displayProfiles)
   }
@@ -1585,13 +1604,26 @@ final class AppModel: ObservableObject {
   }
 
   private func restoreAssignments() {
-    guard
-      let saved = defaults.dictionary(forKey: "displayAssignments") as? [String: String]
-    else { return }
+    restoreAssignments(for: displays)
+  }
 
-    for display in displays {
+  private func restoreAssignments(
+    for targetDisplays: [DisplayDescriptor]
+  ) {
+    let saved =
+      defaults.dictionary(forKey: Keys.displayAssignments) as? [String: String]
+    let legacy =
+      defaults.dictionary(forKey: Keys.legacyDisplayAssignments) as? [String: String]
+
+    guard saved != nil || legacy != nil else { return }
+
+    for display in targetDisplays {
+      let raw =
+        saved?[display.persistentID]
+        ?? legacy?[String(display.id)]
+
       guard
-        let raw = saved[String(display.id)],
+        let raw,
         let id = UUID(uuidString: raw),
         let wallpaper = wallpapers.first(where: { $0.id == id }),
         !quarantine.isQuarantined(id)
@@ -1613,10 +1645,32 @@ final class AppModel: ObservableObject {
 
   private func saveAssignments() {
     quarantine.recordActiveWallpaperIDs(activeWallpaperIDs)
-    let dictionary = engine.assignmentSnapshot.reduce(into: [String: String]()) {
-      $0[String($1.key)] = $1.value.uuidString
+
+    var dictionary =
+      defaults.dictionary(forKey: Keys.displayAssignments) as? [String: String]
+      ?? [:]
+
+    let connectedIDs = Set(displays.map(\.persistentID))
+    dictionary = dictionary.filter {
+      !connectedIDs.contains($0.key)
     }
-    defaults.set(dictionary, forKey: "displayAssignments")
+
+    let displayByRuntimeID = Dictionary(
+      uniqueKeysWithValues: displays.map { ($0.id, $0) }
+    )
+
+    for (runtimeID, wallpaperID) in engine.assignmentSnapshot {
+      guard let display = displayByRuntimeID[runtimeID] else { continue }
+      dictionary[display.persistentID] = wallpaperID.uuidString
+    }
+
+    defaults.set(dictionary, forKey: Keys.displayAssignments)
+    defaults.removeObject(forKey: Keys.legacyDisplayAssignments)
+  }
+
+  private func clearSavedAssignments() {
+    defaults.removeObject(forKey: Keys.displayAssignments)
+    defaults.removeObject(forKey: Keys.legacyDisplayAssignments)
   }
 
   private func scheduleLockScreenRefresh() {
@@ -1736,7 +1790,38 @@ final class AppModel: ObservableObject {
   }
 
   private func saveDisplayProfiles() {
-    if let data = try? JSONEncoder().encode(Array(displayProfiles.values)) {
+    let existing: [DisplayPerformanceProfile]
+
+    if let data = defaults.data(forKey: Keys.displayProfiles),
+      let decoded = try? JSONDecoder().decode(
+        [DisplayPerformanceProfile].self,
+        from: data
+      )
+    {
+      existing = decoded
+    } else {
+      existing = []
+    }
+
+    var merged = Dictionary(
+      uniqueKeysWithValues: existing.map { profile in
+        (
+          profile.persistentDisplayID ?? "legacy:\(profile.displayID)",
+          profile
+        )
+      }
+    )
+
+    for display in displays {
+      merged.removeValue(forKey: "legacy:\(display.id)")
+
+      guard var profile = displayProfiles[display.id] else { continue }
+      profile.displayID = display.id
+      profile.persistentDisplayID = display.persistentID
+      merged[display.persistentID] = profile
+    }
+
+    if let data = try? JSONEncoder().encode(Array(merged.values)) {
       defaults.set(data, forKey: Keys.displayProfiles)
     }
   }
@@ -1800,20 +1885,35 @@ final class AppModel: ObservableObject {
       saved = []
     }
 
-    var profiles = Dictionary(
-      uniqueKeysWithValues: saved.map {
-        (CGDirectDisplayID($0.displayID), $0)
-      }
-    )
+    var profiles: [CGDirectDisplayID: DisplayPerformanceProfile] = [:]
 
-    for display in displays where profiles[display.id] == nil {
-      profiles[display.id] = DisplayPerformanceProfile(
-        displayID: display.id,
-        targetFPS: min(fallbackFPS, display.maximumFPS),
-        renderScale: fallbackScale,
-        maximumResolution: maximumResolution,
-        fitMode: .fill
+    for display in displays {
+      var profile =
+        saved.first(where: {
+          $0.persistentDisplayID == display.persistentID
+        })
+        ?? saved.first(where: {
+          $0.persistentDisplayID == nil
+            && CGDirectDisplayID($0.displayID) == display.id
+        })
+        ?? DisplayPerformanceProfile(
+          displayID: display.id,
+          persistentDisplayID: display.persistentID,
+          targetFPS: min(fallbackFPS, display.maximumFPS),
+          renderScale: fallbackScale,
+          maximumResolution: maximumResolution,
+          fitMode: .fill
+        )
+
+      profile.displayID = display.id
+      profile.persistentDisplayID = display.persistentID
+      profile.targetFPS = min(
+        max(1, profile.targetFPS),
+        display.maximumFPS
       )
+      profile.renderScale = min(max(profile.renderScale, 0.25), 1)
+
+      profiles[display.id] = profile
     }
 
     return profiles
