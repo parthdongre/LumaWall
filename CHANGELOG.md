@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hardened in-app updates with SHA-256 verification against the release checksum manifest before opening a DMG or PKG.
+- Added automatic update checks at most once per day, enabled by default and user-toggleable in Settings.
+- Added update integrity regression tests for version comparison, checksum parsing, and chunked file hashing.
 - Added native drag-and-drop importing across the Library with a clear drop-target treatment.
 - Added a unified Add menu for normal wallpaper imports, Wallpaper Engine project imports, and Creator Studio.
 - Added batch import handling so Finder drops and multi-select imports use the same library path.
