@@ -372,7 +372,7 @@ final class AppModel: ObservableObject {
       queue: .main
     ) { [weak self] _ in
       Task { @MainActor in
-        self?.screenCapturePermission.refresh()
+        self?.refreshScreenCapturePermission()
       }
     }
 
@@ -1265,6 +1265,13 @@ final class AppModel: ObservableObject {
 
   func refreshScreenCapturePermission() {
     screenCapturePermission.refresh()
+
+    if systemAudioEnabled, !screenCapturePermission.isGranted {
+      systemAudioEnabled = false
+      syncSystemAudioCapture()
+      statusMessage =
+        "Screen & System Audio Recording access was revoked; audio reaction has been disabled."
+    }
   }
 
   private func syncSystemAudioCapture() {
