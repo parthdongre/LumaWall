@@ -67,6 +67,7 @@ final class AppModel: ObservableObject {
   private var previewGenerationInFlight = Set<UUID>()
   private var lockScreenRefreshTask: Task<Void, Never>?
   private var suspensionAudioTask: Task<Void, Never>?
+  private var systemAudioCaptureRunning = false
   private var telemetryTimer: Timer?
   private let defaults = UserDefaults.standard
 
@@ -267,22 +268,8 @@ final class AppModel: ObservableObject {
 
     suspension.onChanged = { [weak self] suspended in
       guard let self else { return }
-
       self.engine.setSystemSuspended(suspended)
-      self.suspensionAudioTask?.cancel()
-      self.suspensionAudioTask = nil
-
-      guard self.systemAudioEnabled else { return }
-
-      self.suspensionAudioTask = Task { @MainActor [weak self] in
-        guard let self, !Task.isCancelled else { return }
-
-        if suspended {
-          await self.audio.stop()
-        } else {
-          try? await self.audio.startSystemAudio()
-        }
-      }
+      self.syncSystemAudioCapture()
     }
 
     automation.onWallpaperRequested = { [weak self] id in
@@ -667,9 +654,17 @@ final class AppModel: ObservableObject {
   func shutdown() {
     lockScreenRefreshTask?.cancel()
     lockScreenRefreshTask = nil
-    suspensionAudioTask?.cancel()
-    suspensionAudioTask = nil
+    systemAudioEnabled = false
     suspension.onChanged = nil
+
+    let pendingAudioTask = suspensionAudioTask
+    suspensionAudioTask = Task { @MainActor [weak self] in
+      await pendingAudioTask?.value
+      guard let self else { return }
+      await self.audio.stop()
+      self.systemAudioCaptureRunning = false
+    }
+
     telemetryTimer?.invalidate()
     telemetryTimer = nil
     livePreview.stop()
@@ -1233,21 +1228,37 @@ final class AppModel: ObservableObject {
 
   func setSystemAudioEnabled(_ enabled: Bool) {
     systemAudioEnabled = enabled
+    syncSystemAudioCapture()
+  }
 
-    suspensionAudioTask?.cancel()
+  private func syncSystemAudioCapture() {
+    let previousTask = suspensionAudioTask
+
     suspensionAudioTask = Task { @MainActor [weak self] in
-      guard let self, !Task.isCancelled else { return }
+      await previousTask?.value
 
-      do {
-        if enabled, !self.suspension.isSuspended {
+      guard let self else { return }
+
+      let shouldCapture =
+        self.systemAudioEnabled
+        && !self.suspension.isSuspended
+
+      guard shouldCapture != self.systemAudioCaptureRunning else {
+        return
+      }
+
+      if shouldCapture {
+        do {
           try await self.audio.startSystemAudio()
-        } else {
-          await self.audio.stop()
+          self.systemAudioCaptureRunning = true
+        } catch {
+          self.systemAudioCaptureRunning = false
+          self.systemAudioEnabled = false
+          self.show(error)
         }
-      } catch {
-        guard !Task.isCancelled else { return }
-        self.systemAudioEnabled = false
-        self.show(error)
+      } else {
+        await self.audio.stop()
+        self.systemAudioCaptureRunning = false
       }
     }
   }
