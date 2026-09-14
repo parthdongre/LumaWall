@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Added a real SwiftUI macro compiler probe to `make doctor`; CLT-only setups now fail with the actionable `SwiftUIMacros.StateMacro` reason instead of conflating it with Metal.
+- Added `make repair` to clear stale SwiftPM build state after toolchain/resource changes and `make verify` for debug build + tests + release build.
+- Standalone `metal` is now treated as optional for the current copied shader resources, with Xcode 26 MetalToolchain installation guidance when build-time Metal compilation is actually needed.
+- Hardened crash quarantine attribution so stopped or non-restored wallpapers are not blamed for later unrelated crashes.
+- Added visible stability history, strike counts, quarantine reset, and recovery diagnostics plus isolated crash-quarantine regression tests.
+- Added reason-aware rendering suspension for system sleep, display sleep, and inactive user sessions so overlapping wake events cannot resume wallpapers early.
+- Serialized system-audio capture start/stop transitions to prevent duplicate or stale ScreenCaptureKit streams during rapid sleep/wake/session changes.
+- Added suspension diagnostics and regression tests for overlap, duplicate notifications, and reset behavior.
 - Added a generated Retina macOS app icon embedded into packaged builds and verified in CI/DMG validation.
 - Onboarding and About now use the real application icon instead of a generic system symbol.
 - Switched the control surface to a single native macOS window while keeping the wallpaper engine alive when that window closes.
@@ -22,7 +30,7 @@
 - Added native drag-and-drop importing across the Library with a clear drop-target treatment.
 - Added a unified Add menu for normal wallpaper imports, Wallpaper Engine project imports, and Creator Studio.
 - Added batch import handling so Finder drops and multi-select imports use the same library path.
-- Added `make doctor` to validate macOS, full Xcode selection, Swift, the macOS SDK, and the Metal compiler before build/run/package commands.
+- Added `make doctor` to validate macOS, full Xcode selection, Swift, the macOS SDK, SwiftPM, and SwiftUI macro availability before build/run/package commands.
 - Improved the local Metal/toolchain troubleshooting path so Command Line Tools misconfiguration fails early with an actionable fix.
 
 
