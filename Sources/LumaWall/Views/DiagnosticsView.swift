@@ -60,6 +60,11 @@ struct DiagnosticsView: View {
             value: "\(model.engine.fullscreenPausedDisplayIDs.count)",
             symbol: "rectangle.slash"
           )
+          metric(
+            title: "System Suspended",
+            value: model.suspension.isSuspended ? "Yes" : "No",
+            symbol: "moon.zzz"
+          )
         }
 
         GroupBox("Detected hardware") {
@@ -189,6 +194,29 @@ struct DiagnosticsView: View {
               "Automatic profiles",
               model.usePowerProfiles ? "Enabled" : "Disabled"
             )
+          }
+        }
+
+        GroupBox("System suspension") {
+          VStack(alignment: .leading, spacing: 8) {
+            diagnosticRow(
+              "Rendering",
+              model.suspension.isSuspended ? "Suspended" : "Active"
+            )
+            diagnosticRow(
+              "Reasons",
+              model.suspension.activeReasons.isEmpty
+                ? "None"
+                : model.suspension.activeReasons
+                  .map(\.displayName)
+                  .sorted()
+                  .joined(separator: ", ")
+            )
+            Text(
+              "System sleep, display sleep, and an inactive user session are tracked independently so one wake event cannot resume rendering while another suspension reason is still active."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
           }
         }
 
