@@ -60,6 +60,23 @@ struct MenuBarView: View {
         )
       )
 
+      if model.updater.updateAvailable {
+        Divider()
+
+        VStack(alignment: .leading, spacing: 6) {
+          Label(
+            "LumaWall \(model.updater.latestVersion ?? "") is available",
+            systemImage: "arrow.down.circle.fill"
+          )
+          .font(.caption.weight(.semibold))
+
+          Button(model.updater.isDownloading ? "Downloading…" : "Download Verified Update") {
+            model.updater.downloadAndOpenInstaller()
+          }
+          .disabled(model.updater.isDownloading)
+        }
+      }
+
       Divider()
 
       Button {
@@ -79,6 +96,10 @@ struct MenuBarView: View {
         model.stopWallpapers(on: nil)
       } label: {
         Label("Stop All Wallpapers", systemImage: "stop.fill")
+      }
+
+      SettingsLink {
+        Label("Settings…", systemImage: "gearshape")
       }
 
       Divider()
