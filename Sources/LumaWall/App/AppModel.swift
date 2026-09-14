@@ -459,6 +459,12 @@ final class AppModel: ObservableObject {
     Set(engine.assignmentSnapshot.values)
   }
 
+  var suspectedCrashWallpapers: [Wallpaper] {
+    wallpapers.filter {
+      quarantine.suspectedWallpaperIDs.contains($0.id)
+    }
+  }
+
   var applicationSupportPath: String {
     library.libraryRoot.deletingLastPathComponent().path
   }
@@ -933,6 +939,7 @@ final class AppModel: ObservableObject {
       engine.stopAll()
     }
     saveAssignments()
+    quarantine.recordActiveWallpaperIDs(activeWallpaperIDs)
     statusMessage = displayID == nil ? "Stopped all wallpapers" : "Stopped wallpaper"
   }
 
@@ -1093,6 +1100,11 @@ final class AppModel: ObservableObject {
   func allowQuarantinedWallpaper(_ id: UUID) {
     quarantine.allowAgain(id)
     statusMessage = "Wallpaper re-enabled."
+  }
+
+  func resetStabilityHistory() {
+    quarantine.resetHistory()
+    statusMessage = "Crash quarantine history cleared."
   }
 
   func setUsePowerProfiles(_ enabled: Bool) {
