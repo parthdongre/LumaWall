@@ -360,3 +360,10 @@ This prevents overlapping notifications from resuming rendering too early. For e
 System-audio capture follows the same aggregate suspension state. Audio transitions are serialized through one task chain in AppModel: each transition waits for the previous transition, recomputes the latest desired state, and starts or stops ScreenCaptureKit only when the effective running state actually needs to change. This avoids duplicate capture streams and stale wake events racing with a later suspend event.
 
 Diagnostics exposes whether rendering is system-suspended and lists every active suspension reason. Regression tests cover single-reason suspension, three overlapping reasons, duplicate notifications, and explicit clearing.
+
+
+## macOS 26 compatibility lane
+
+The primary packaging job remains on macOS 15 because it is a stable baseline for the minimum supported macOS family and exercises the full app/DMG/PKG smoke path. A second `macos-26` job now runs the environment doctor, debug build, full test suite, and release build against the current Tahoe-generation GitHub runner.
+
+This compatibility lane is intentionally source/build focused rather than duplicating the expensive packaging screenshots and DMG layout steps. It catches Swift/Xcode SDK changes on the same macOS generation as current development machines while the macOS 15 lane continues to validate distributable artifacts.
