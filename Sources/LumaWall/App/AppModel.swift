@@ -1491,6 +1491,8 @@ final class AppModel: ObservableObject {
         lastError = "Could not restore \(wallpaper.name): \(error.localizedDescription)"
       }
     }
+
+    saveAssignments()
   }
 
   private func saveAssignments() {
