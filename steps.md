@@ -311,3 +311,20 @@ A packaged Mac app can technically run from Downloads or directly from a mounted
 LumaWall now classifies only real .app bundles. SwiftPM development runs are ignored, so developers do not see consumer installation warnings. Packaged copies under either /Applications or a user's Applications folder are accepted. Copies under /Volumes are recognized as running from an installer disk image; other packaged locations such as Downloads receive a softer move-to-Applications recommendation.
 
 The app does not move itself automatically. Instead, onboarding, the main app surface, and Settings provide native Finder handoff actions to reveal the current app and open Applications. This keeps file movement explicit and avoids mutating a running bundle or requesting unnecessary privileges.
+
+
+## Single-window menu-bar lifecycle
+
+LumaWall's wallpaper engine is long-lived, but its control surface should behave like a conventional single-window Mac utility. The main SwiftUI scene therefore uses a single Window instead of a WindowGroup. Closing that window does not terminate the process; wallpapers, automation, update checks, and the MenuBarExtra remain alive.
+
+The AppKit delegate no longer brings the main window forward every time the application becomes active. That behavior was too aggressive for a menu-bar utility because clicking LumaWall's menu bar item or interacting with another app-owned panel could unexpectedly raise the full control window. Explicit entry points—launch, Dock reopen, Finder file open, and the menu-bar Open LumaWall action—remain responsible for surfacing the control window.
+
+The menu bar now exposes Settings directly and advertises an available verified update. Its icon changes when an update is available, making background update discovery useful even when the control window stays closed.
+
+## Central release version
+
+The root VERSION file is the release source of truth for shell packaging and CI. package-macos.sh, install-local.sh, notarize-macos.sh, verify-release.sh, and the main build workflow read this value instead of embedding independent defaults.
+
+AppVersion.fallbackVersion remains a compile-time Swift fallback for source/development launches, but a regression test reads VERSION relative to the test source tree and requires both values to match. Tagged release workflows also compare the tag against VERSION and fail before signing or publishing on mismatch.
+
+This keeps the installed Info.plist version, artifact filenames, update comparison, checksums, and release tag aligned through a version bump.
