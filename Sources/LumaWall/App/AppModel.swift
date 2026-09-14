@@ -291,6 +291,13 @@ final class AppModel: ObservableObject {
       in: &cancellables)
     updater.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
+
+    Task { @MainActor [weak self] in
+      try? await Task.sleep(nanoseconds: 3_000_000_000)
+      guard !Task.isCancelled, let self else { return }
+      self.updater.performAutomaticCheckIfNeeded(currentVersion: AppVersion.version)
+    }
+
     power.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
       in: &cancellables)
     discover.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }.store(
