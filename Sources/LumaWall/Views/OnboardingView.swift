@@ -73,6 +73,9 @@ struct OnboardingView: View {
       .foregroundStyle(.secondary)
       .frame(maxWidth: 540)
 
+      InstallationRecommendationBanner()
+        .frame(maxWidth: 600)
+
       HStack(spacing: 26) {
         feature("display.2", "Per-display", "Different wallpaper on every monitor")
         feature("cpu", "Native Metal", "GPU-powered procedural wallpapers")
