@@ -349,3 +349,14 @@ On startup, an unclean previous launch increments stability strikes only for the
 Recovery and Diagnostics now expose whether the previous launch was clean, the suspected wallpaper set, current strike counts, and quarantined wallpapers. Resetting stability history clears persisted counts/quarantine state but immediately re-records currently active wallpaper IDs so future crash attribution continues correctly.
 
 The crash service accepts an isolated UserDefaults suite for testing. Regression coverage exercises clean first launch, unclean attribution, quarantine threshold, stop-before-crash false-positive prevention, stable-run strike reset, re-enable behavior, clean shutdown, and full history reset.
+
+
+## Sleep, screen, and user-session suspension
+
+LumaWall now treats system sleep, display sleep, and an inactive macOS user session as independent suspension reasons. A small SystemSuspensionCoordinator owns the active reason set and only changes the engine's suspended state when the set transitions between empty and non-empty.
+
+This prevents overlapping notifications from resuming rendering too early. For example, a system wake does not resume wallpapers if the displays are still asleep or the user session is still switched out. Duplicate sleep/wake notifications are idempotent.
+
+System-audio capture follows the same aggregate suspension state. Audio transitions are serialized through one task chain in AppModel: each transition waits for the previous transition, recomputes the latest desired state, and starts or stops ScreenCaptureKit only when the effective running state actually needs to change. This avoids duplicate capture streams and stale wake events racing with a later suspend event.
+
+Diagnostics exposes whether rendering is system-suspended and lists every active suspension reason. Regression tests cover single-reason suspension, three overlapping reasons, duplicate notifications, and explicit clearing.
