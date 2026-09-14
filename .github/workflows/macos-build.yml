@@ -18,6 +18,12 @@ jobs:
       - name: Swift version
         run: swift --version
 
+      - name: Validate release scripts
+        run: |
+          bash -n scripts/package-macos.sh
+          bash -n scripts/notarize-macos.sh
+          bash -n scripts/verify-release.sh
+
       - name: Build
         run: swift build
 
@@ -60,6 +66,14 @@ jobs:
         run: |
           chmod +x scripts/package-macos.sh
           ./scripts/package-macos.sh
+
+      - name: Verify packaged release artifacts
+        if: github.event_name == 'push'
+        env:
+          VERSION: 0.4.0
+        run: |
+          chmod +x scripts/verify-release.sh
+          ./scripts/verify-release.sh
 
       - name: Verify finished DMG contents
         if: github.event_name == 'push'
