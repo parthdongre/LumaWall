@@ -160,3 +160,38 @@ jobs:
 
           grep -q "Command Line Tools are selected instead of full Xcode" <<< "$OUTPUT"
           grep -q "SwiftUIMacros.StateMacro" <<< "$OUTPUT"
+
+
+  macos-26-compatibility:
+    name: macOS 26 / Xcode compatibility
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          sw_vers
+          xcode-select -p
+          xcodebuild -version
+          swift --version
+
+      - name: Validate scripts
+        run: |
+          bash -n scripts/doctor.sh
+          bash -n scripts/repair-dev.sh
+          bash -n scripts/package-macos.sh
+          bash -n scripts/notarize-macos.sh
+          bash -n scripts/verify-release.sh
+          swift package dump-package >/dev/null
+
+      - name: Development environment doctor
+        run: make doctor
+
+      - name: Debug build
+        run: swift build
+
+      - name: Tests
+        run: swift test
+
+      - name: Release build
+        run: swift build -c release
