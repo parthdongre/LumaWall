@@ -403,7 +403,10 @@ struct SettingsView: View {
 
         Toggle(
           "Automatically check for updates",
-          isOn: $model.updater.automaticallyChecksForUpdates
+          isOn: Binding(
+            get: { model.updater.automaticallyChecksForUpdates },
+            set: { model.updater.automaticallyChecksForUpdates = $0 }
+          )
         )
 
         if let lastCheckedAt = model.updater.lastCheckedAt {
